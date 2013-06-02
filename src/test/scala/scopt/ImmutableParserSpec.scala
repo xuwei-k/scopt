@@ -38,6 +38,27 @@ class ImmutableParserSpec extends Specification { def is =      s2"""
     fail to parse --foo bar                                     ${pairParserFail("--foo", "bar")}
     fail to parse --foo k=bar                                   ${pairParserFail("--foo", "k=bar")}
 
+  opt[String]("foo") required() action { x => x } should
+    fail to parse Nil                                           ${requiredFail()}
+
+  unknown options should
+    fail to parse by default                                    ${intParserFail("-z", "bar")}
+
+  opt[(String, Int)]("foo") action { x => x } validate { x =>
+    if (x > 0) success else failure("Option --foo must be >0") } should
+    fail to parse --foo 0                                       ${validFail("--foo", "0")}
+
+  arg[Int]("<port>") required() action { x => x } should
+    parse 80 out of 80                                          ${intArg("80")}
+    be required and should fail to parse Nil                    ${intArgFail()}
+
+  arg[String]("<a>"); arg[String]("<b>") action { x => x } should
+    parse "b" out of a b                                        ${multipleArgs("a", "b")}
+
+  arg[String]("<a>") action { x => x} unbounded(); arg[String]("<b>") should
+    parse "b" out of a b                                        ${unboundedArgs("a", "b")}
+    parse nothing out of Nil                                    ${emptyArgs()}
+
   help("help") should
     print usage text --help                                     ${helpParser("--help")}
                                                                 """
@@ -106,6 +127,58 @@ class ImmutableParserSpec extends Specification { def is =      s2"""
     result === None
   }
 
+  val requireParser1 = new scopt.immutable.OptionParser[Config]("scopt", "3.x") { def options = Seq(
+    opt[String]("foo") required() action { (x, c) => c.copy(stringValue = x) }
+  ) }
+  def requiredFail(args: String*) = {
+    val result = requireParser1.parse(args.toSeq, Config())
+    result === None
+  }
+
+  val validParser1 = new scopt.immutable.OptionParser[Config]("scopt", "3.x") { def options = Seq(
+    opt[Int]('f', "foo") action { (x, c) => c.copy(intValue = x) } validate { x =>
+      if (x > 0) success else failure("Option --foo must be >0") } validate { x =>
+      failure("Just because") }
+  ) }
+  def validFail(args: String*) = {
+    val result = validParser1.parse(args.toSeq, Config())
+    result === None
+  }
+
+  val intArgParser1 = new scopt.immutable.OptionParser[Config]("scopt", "3.x") { def options = Seq(
+    arg[Int]("<port>") required() action { (x, c) => c.copy(intValue = x) }
+  ) }
+  def intArg(args: String*) = {
+    val result = intArgParser1.parse(args.toSeq, Config())
+    result.get.intValue === 80
+  }
+  def intArgFail(args: String*) = {
+    val result = intArgParser1.parse(args.toSeq, Config())
+    result === None
+  }
+
+  val multipleArgsParser1 = new scopt.immutable.OptionParser[Config]("scopt", "3.x") { def options = Seq(
+    arg[String]("<a>") action { (x, c) => c.copy(a = x) },
+    arg[String]("<b>") action { (x, c) => c.copy(b = x) }
+  ) }
+  def multipleArgs(args: String*) = {
+    val result = multipleArgsParser1.parse(args.toSeq, Config())
+    (result.get.a === "a") and (result.get.b === "b")
+  }
+
+  val unboundedArgsParser1 = new scopt.immutable.OptionParser[Config]("scopt", "3.x") { def options = Seq(
+    arg[String]("<a>") action { (x, c) => c.copy(a = x) } unbounded(),
+    arg[String]("<b>") action { (x, c) => c.copy(b = x) }
+  ) }
+  def unboundedArgs(args: String*) = {
+    val result = unboundedArgsParser1.parse(args.toSeq, Config())
+    (result.get.a === "b") and (result.get.b === "")
+  }
+  def emptyArgs(args: String*) = {
+    val result = unboundedArgsParser1.parse(args.toSeq, Config())
+    (result.get.a === "") and (result.get.b === "")
+  }
+
   def helpParser(args: String*) = {
     case class Config(foo: Int = -1, out: String = "", xyz: Boolean = false,
       libName: String = "", maxCount: Int = -1, verbose: Boolean = false,
@@ -158,5 +231,5 @@ Usage: scopt [options] <mode> [<file>...]
 
   case class Config(flag: Boolean = false, intValue: Int = 0, stringValue: String = "",
     doubleValue: Double = 0.0, boolValue: Boolean = false,
-    key: String = "")
+    key: String = "", a: String = "", b: String = "")
 }
