@@ -8,15 +8,25 @@ import scopt.generic._
  * <a href="#opt(String,String,String,String,(String) ⇒ Unit):Unit"><code>opt</code></a> method or
  * <a href="#arg(String,String,(String) ⇒ Unit):Unit"><code>arg</code></a> method.
  * {{{
- * val parser = new OptionParser("scopt") {
- *   intOpt("f", "foo", "foo is an integer property", {v: Int => config.foo = v})
- *   opt("o", "output", "<file>", "output is a string property", {v: String => config.bar = v})
- *   booleanOpt("xyz", "xyz is a boolean property", {v: Boolean => config.xyz = v})
- *   keyValueOpt("l", "lib", "<libname>", "<filename>", "load library <libname>",
- *     {(key: String, value: String) => { config.libname = key; config.libfile = value } })
- *   arg("<singlefile>", "<singlefile> is an argument", {v: String => config.whatnot = v})
- *   // arglist("<file>...", "arglist allows variable number of arguments",
- *   //   {v: String => config.files = (v :: config.files).reverse })
+ * val parser = new scopt.OptionParser("scopt", "3.x") {
+ *   opt[Int]('f', "foo") action { x =>
+ *     c = c.copy(foo = x) } text("foo is an integer property")
+ *   opt[String]('o', "out") required() valueName("<file>") action { x =>
+ *     c = c.copy(out = x) } text("out is a required string property")
+ *   opt[Boolean]("xyz") action { x =>
+ *     c = c.copy(xyz = x) } text("xyz is a boolean property")
+ *   opt[(String, Int)]("max") action { case (k, v) =>
+ *     c = c.copy(libName = k, maxCount = v) } validate { x =>
+ *     if (x._2 > 0) success else failure("Value <max> must be >0") 
+ *   } keyValueName("<libname>", "<max>") text("maximum count for <libname>")
+ *   opt[Unit]("verbose") action { _ =>
+ *     c = c.copy(verbose = true) } text("verbose is a flag")
+ *   note("some notes.\n")
+ *   help("help") text("prints this usage text")
+ *   arg[String]("<mode>") required() action { x =>
+ *     c = c.copy(mode = x) } text("required argument")
+ *   arg[String]("<file>...") unbounded() action { x =>
+ *     c = c.copy(files = c.files :+ x) } text("optional unbounded args")
  * }
  * if (parser.parse(args)) {
  *   // do stuff
@@ -50,6 +60,7 @@ case class OptionParser(
     _valueName: Option[String] = None,
     _desc: String = "",
     _action: (A => Unit) = { (a: A) => () },
+    _validations: Seq[A => Either[String, Unit]] = Seq(),
     _minOccurs: Int = 0,
     _maxOccurs: Int = 1) extends OptionDefinition[A, Unit] {    
     /** Adds callback function. */
@@ -82,6 +93,10 @@ case class OptionParser(
     /** Adds key and value names used in the usage text. */
     def keyValueName(k: String, v: String): OptionDef[A] =
       keyName(k) valueName(v)
+    /** Adds custom validation. */
+    def validate(f: A => Either[String, Unit]) =
+      updateOption(copy(_validations = _validations :+ f))
+
     def callback: (A, Unit) => Unit =
       { (a, c) => _action(a) }
     def getMinOccurs: Int = _minOccurs

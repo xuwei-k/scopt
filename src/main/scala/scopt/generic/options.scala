@@ -3,13 +3,12 @@ package scopt.generic
 import collection.mutable.{ListBuffer, ListMap}
 
 trait Read[A] {
-  def tokensToRead: Int 
   def arity: Int
+  def tokensToRead: Int = if (arity == 0) 0 else 1
   def reads: String => A
 }
 object Read {
   def reads[A](f: String => A): Read[A] = new Read[A] {
-    val tokensToRead = 1
     val arity = 1
     val reads = f
   }
@@ -28,7 +27,6 @@ object Read {
         throw new IllegalArgumentException("'" + s + "' is not a boolean.")
     }}
   implicit def tupleRead[A1: Read, A2: Read]: Read[(A1, A2)] = new Read[(A1, A2)] {
-    val tokensToRead = 1
     val arity = 2
     val reads = { (s: String) =>
       splitKeyValue(s) match {
@@ -41,8 +39,7 @@ object Read {
       case -1     => throw new IllegalArgumentException("Expected a key=value pair")
       case n: Int => (s.slice(0, n), s.slice(n + 1, s.length))
     }
-  implicit val unitRead: Read[Unit] = new Read[Unit] { 
-    val tokensToRead = 0
+  implicit val unitRead: Read[Unit] = new Read[Unit] {
     val arity = 0
     val reads = { (s: String) => () }
   }
@@ -64,17 +61,37 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
   def _valueName: Option[String]
   def _desc: String
   def shortOptOrBlank: String = _shortOpt map {_.toString} getOrElse("")
+  def _validations: Seq[A => Either[String, Unit]]
   def getMaxOccurs: Int
   def getMinOccurs: Int
 
   def callback: (A, C) => C
-  def applyArgument(arg: String, config: C): Either[String, C] =
+  def applyArgument(arg: String, config: C): Either[Seq[String], C] =
     try {
-      Right(callback(read.reads(arg), config))
+      val x = read.reads(arg)
+      validate(x) match {
+        case Right(_) => Right(callback(x, config))
+        case Left(xs) => Left(xs)
+      }
     } catch {
-      case e: NumberFormatException => Left(shortDescription.capitalize + " expects a number but was given '" + arg + "'")
-      case e: Throwable             => Left(shortDescription.capitalize + " failed when given '" + arg + "'. " + e.getMessage)
+      case e: NumberFormatException => Left(Seq(shortDescription.capitalize + " expects a number but was given '" + arg + "'"))
+      case e: Throwable             => Left(Seq(shortDescription.capitalize + " failed when given '" + arg + "'. " + e.getMessage))
     }
+  def validate(value: A): Either[Seq[String], Unit] = {
+    val results = _validations map {_.apply(value)}
+    (success[Seq[String]] /: results) { (acc, r) =>
+      (acc match {
+        case Right(_) => Seq[String]()
+        case Left(xs) => xs
+      }) ++ (r match {
+        case Right(_) => Seq[String]()
+        case Left(x)  => Seq[String](x)
+      }) match {
+        case Seq()    => acc
+        case xs       => Left(xs)
+      }
+    }
+  }
   // number of tokens to read: 0 or no match, 2 for "--foo 1", 1 for "--foo:1"
   def shortOptTokens(arg: String): Int =
     _shortOpt match {
@@ -150,6 +167,7 @@ private[scopt] object OptionDefinition {
   val defaultValueName = "<value>"
   val atomic = new java.util.concurrent.atomic.AtomicInteger
   def generateId: Int = atomic.incrementAndGet
+  def success[A]: Either[A, Unit] = Right(())
 }
 
 private[scopt] trait GenericOptionParser[C] {
@@ -157,6 +175,8 @@ private[scopt] trait GenericOptionParser[C] {
   def version: Option[String]
   def programName: Option[String]
   def errorOnUnknownArgument: Boolean
+  def success: Either[String, Unit] = OptionDefinition.success[String]
+  def failure(msg: String): Either[String, Unit] = Left(msg)
 
   protected def nonArgs: Seq[OptionDefinition[_, C]] = options filter {_.kind != Arg}
   protected def arguments: Seq[OptionDefinition[_, C]] = options filter {_.kind == Arg}
@@ -176,7 +196,13 @@ private[scopt] trait GenericOptionParser[C] {
   }
 
   def showUsage = Console.err.println(usage)
-    
+  def reportError(msg: String) {
+    System.err.println("Error: " + msg)
+  }
+  def reportWarning(msg: String) {
+    System.err.println("Warning: " + msg)
+  }
+
   /** parses the given `args`.
    */
   def parse(args: Seq[String], init: C): Option[C] = {
@@ -189,17 +215,17 @@ private[scopt] trait GenericOptionParser[C] {
 
     def handleError(msg: String) {
       if (errorOnUnknownArgument) {
-        System.err.println("Error: " + msg)
         _error = true
+        reportError(msg)
       }
-      else System.err.println("Warning: " + msg)
+      else reportWarning(msg)
     }
     def handleArgument(opt: OptionDefinition[_, C], arg: String) {
       opt.applyArgument(arg, _config) match {
-        case Right(c)  => _config = c
-        case Left(msg) =>
+        case Right(c) => _config = c
+        case Left(xs) =>
           _error = true
-          System.err.println("Error: " + msg)
+          xs foreach reportError
       }
     }
     while (i < args.length) {
@@ -233,13 +259,13 @@ private[scopt] trait GenericOptionParser[C] {
       i += 1
     }
     (pendingOptions filter { opt => opt.getMinOccurs > occurrences(opt) }) foreach { opt =>
-      if (opt.getMinOccurs == 1) System.err.println("Error: Missing " + opt.shortDescription)
-      else System.err.println("Error: " + opt.shortDescription.capitalize + " must be given " + opt.getMinOccurs + " times")
+      if (opt.getMinOccurs == 1) reportError("Missing " + opt.shortDescription)
+      else reportError(opt.shortDescription.capitalize + " must be given " + opt.getMinOccurs + " times")
       _error = true
     }
     (pendingArgs filter { arg => arg.getMinOccurs > occurrences(arg) }) foreach { arg =>
-      if (arg.getMinOccurs == 1) System.err.println("Error: Missing " + arg.shortDescription)
-      else System.err.println("Error: '" + arg.shortDescription.capitalize + "' must be given " + arg.getMinOccurs + " times")
+      if (arg.getMinOccurs == 1) reportError("Missing " + arg.shortDescription)
+      else reportError(arg.shortDescription.capitalize + "' must be given " + arg.getMinOccurs + " times")
       _error = true
     }
     if (_error) {

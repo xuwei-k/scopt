@@ -44,6 +44,10 @@ class MutableParserSpec extends Specification { def is =      s2"""
   unknown options should
     fail to parse by default                                    ${intParserFail("-z", "bar")}
 
+  opt[(String, Int)]("foo") action { x => x } validate { x =>
+    if (x > 0) success else failure("Option --foo must be >0") } should
+    fail to parse --foo 0                                       ${validFail("--foo", "0")}
+
   arg[Int]("<port>") required() action { x => x } should
     parse 80 out of 80                                          ${intArg("80")}
     be required and should fail to parse Nil                    ${intArgFail()}
@@ -161,6 +165,16 @@ class MutableParserSpec extends Specification { def is =      s2"""
     parser.parse(args.toSeq) === false
   }
 
+  def validFail(args: String*) = {
+    var foo = 0
+    val parser = new scopt.OptionParser("scopt", "3.x") {
+      opt[Int]('f', "foo") action { x => foo = x } validate { x =>
+        if (x > 0) success else failure("Option --foo must be >0") } validate { x =>
+        failure("Just because") }
+    }
+    parser.parse(args.toSeq) === false
+  }
+
   def intArg(args: String*) = {
     var port = 0
     val parser = new scopt.OptionParser("scopt", "3.x") {
@@ -213,7 +227,7 @@ class MutableParserSpec extends Specification { def is =      s2"""
   def helpParser(args: String*) = {
     case class Config(foo: Int = -1, out: String = "", xyz: Boolean = false,
       libName: String = "", maxCount: Int = -1, verbose: Boolean = false,
-      files: Seq[String] = Seq())
+      mode: String = "", files: Seq[String] = Seq())
     var c = Config()    
     val parser = new scopt.OptionParser("scopt", "3.x") {
       opt[Int]('f', "foo") action { x =>
@@ -223,19 +237,22 @@ class MutableParserSpec extends Specification { def is =      s2"""
       opt[Boolean]("xyz") action { x =>
         c = c.copy(xyz = x) } text("xyz is a boolean property")
       opt[(String, Int)]("max") action { case (k, v) =>
-        c = c.copy(libName = k, maxCount = v)
+        c = c.copy(libName = k, maxCount = v) } validate { x =>
+        if (x._2 > 0) success else failure("Value <max> must be >0") 
       } keyValueName("<libname>", "<max>") text("maximum count for <libname>")
       opt[Unit]("verbose") action { _ =>
         c = c.copy(verbose = true) } text("verbose is a flag")
       note("some notes.\n")
       help("help") text("prints this usage text")
+      arg[String]("<mode>") required() action { x =>
+        c = c.copy(mode = x) } text("required argument")
       arg[String]("<file>...") unbounded() action { x =>
         c = c.copy(files = c.files :+ x) } text("optional unbounded args")
     }
     parser.parse(args.toSeq)
     parser.usage === """
 scopt 3.x
-Usage: scopt [options] [<file>...]
+Usage: scopt [options] <mode> [<file>...]
 
   -f <value> | --foo <value>
         foo is an integer property
@@ -251,6 +268,8 @@ Usage: scopt [options] [<file>...]
 
   --help
         prints this usage text
+  <mode>
+        required argument
   <file>...
         optional unbounded args
 """
