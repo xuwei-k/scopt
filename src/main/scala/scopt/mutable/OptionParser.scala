@@ -105,13 +105,15 @@ case class OptionParser(
   }
 
   protected def makeDef[A: Read](kind: OptionDefKind, name: String): Def[A] =
-    add(OptionDef[A](id = generateId, kind = kind, name = name))
+    updateOption(OptionDef[A](id = generateId, kind = kind, name = name))
 
-  protected def add[A: Read](option: OptionDef[A]): OptionDef[A] = {
-    options += option
+  protected def updateOption[A: Read](option: OptionDef[A]): OptionDef[A] = {
+    val idx = options indexWhere { _.id == option.id }
+    if (idx > -1) options(idx) = option
+    else options += option
     option
   }
-
+  
   /** parses the given `args`.
    * @return `true` if successful, `false` otherwise
    */
@@ -120,14 +122,6 @@ case class OptionParser(
       case Some(x) => true
       case None    => false
     }
-
-  protected def updateOption[A: Read](option: OptionDef[A]): OptionDef[A] = {
-    val idx = options indexWhere { _.id == option.id }
-    if (idx > -1) options(idx) = option
-    else options += option
-
-    option
-  }
 
   /** adds an option invoked by `--name` that displays usage text.
    * @param name0 name of the option
