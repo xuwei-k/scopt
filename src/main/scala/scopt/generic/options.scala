@@ -68,16 +68,12 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
   def getMinOccurs: Int
 
   def callback: (A, C) => C
-  def applyArgument(arg: String, config: C): Option[C]  =
+  def applyArgument(arg: String, config: C): Either[String, C] =
     try {
-      Some(callback(read.reads(arg), config))
+      Right(callback(read.reads(arg), config))
     } catch {
-      case e: NumberFormatException =>
-        System.err.println("Error: " + shortDescription + " expects a number but was given '" + arg + "'")
-        None
-      case e: Throwable =>
-        System.err.println("Error: " + shortDescription + " failed when given '" + arg + "'. " + e.getMessage)
-        None
+      case e: NumberFormatException => Left(shortDescription + " expects a number but was given '" + arg + "'")
+      case e: Throwable             => Left(shortDescription + " failed when given '" + arg + "'. " + e.getMessage)
     }
   // number of tokens to read: 0 or no match, 2 for "--foo 1", 1 for "--foo:1"
   def shortOptTokens(arg: String): Int =
@@ -87,8 +83,8 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
       case _ => 0
     }
   def longOptTokens(arg: String): Int =
-    if (arg == "--" + name) 1 + read.tokensToRead
-    else if (arg startsWith ("--" + name + ":")) 1
+    if (arg == fullName) 1 + read.tokensToRead
+    else if (arg startsWith (fullName + ":")) 1
     else 0
   def tokensToRead(i: Int, args: Seq[String]): Int =
     if (i >= args.length || kind != Opt) 0
@@ -103,7 +99,7 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
       case arg if longOptTokens(arg) == 2 || shortOptTokens(arg) == 2 =>
         token(i + 1, args) map {Right(_)} getOrElse Left("Missing value after '" + arg + "'")
       case arg if longOptTokens(arg) == 1 && read.tokensToRead == 1 =>
-        Right(arg drop ("--" + name + ":").length)
+        Right(arg drop (fullName + ":").length)
       case arg if shortOptTokens(arg) == 1 && read.tokensToRead == 1 =>
         Right(arg drop ("-" + shortOptOrBlank + ":").length)
       case _ => Right("")
@@ -117,20 +113,25 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
       case Arg => name + NLTB + _desc
       case Opt if read.arity == 2 =>
         (_shortOpt map { o => "-" + o + ":" + keyValueString + " | " } getOrElse { "" }) +
-        "--" + name + ":" + keyValueString + NLTB + _desc
+        fullName + ":" + keyValueString + NLTB + _desc
       case Opt if read.arity == 1 =>
         (_shortOpt map { o => "-" + o + " " + valueString + " | " } getOrElse { "" }) +
-        "--" + name + " " + valueString + NLTB + _desc
+        fullName + " " + valueString + NLTB + _desc
       case Opt =>
         (_shortOpt map { o => "-" + o + " | " } getOrElse { "" }) + 
-        "--" + name + NLTB + _desc    
+        fullName + NLTB + _desc    
     }    
   def keyValueString: String = (_keyName getOrElse defaultKeyName) + "=" + valueString 
   def valueString: String = (_valueName getOrElse defaultValueName)
   def shortDescription: String =
     kind match {
-      case Opt => "option " + name
-      case _   => "argument " + name
+      case Opt => "option " + fullName
+      case _   => "argument " + fullName
+    }
+  def fullName: String =
+    kind match {
+      case Opt => "--" + name
+      case _   => name
     }
 }
 
@@ -176,6 +177,7 @@ private[scopt] trait GenericOptionParser[C] {
   def parse(args: Seq[String], init: C): Option[C] = {
     var i = 0
     val pendingArgs = ListBuffer() ++ arguments
+    val pendingOptions = ListBuffer() ++ nonArgs
     val occurrences = ListMap[OptionDefinition[_, C], Int]().withDefaultValue(0)
     var _config: C = init
     var _error = false
@@ -189,13 +191,19 @@ private[scopt] trait GenericOptionParser[C] {
     }
     def handleArgument(opt: OptionDefinition[_, C], arg: String) {
       opt.applyArgument(arg, _config) match {
-        case Some(c) => _config = c
-        case None    => _error = true
+        case Right(c)  => _config = c
+        case Left(msg) =>
+          _error = true
+          System.err.println("Error: " + msg)
       }
     }
     while (i < args.length) {
-      nonArgs.find(_.tokensToRead(i, args) > 0) match {
+      pendingOptions find {_.tokensToRead(i, args) > 0} match {
         case Some(option) =>
+          occurrences(option) += 1
+          if (occurrences(option) >= option.getMaxOccurs) {
+            pendingOptions -= option
+          }
           option(i, args) match {
             case Right(v) =>          handleArgument(option, v)
             case Left(outOfBounds) => handleError(outOfBounds)
@@ -219,21 +227,20 @@ private[scopt] trait GenericOptionParser[C] {
       }
       i += 1
     }
-    
-    // if ((unseenArgs.toList exists { _.minOccurs > 0 }) ||
-    //     (argListCount == 0 && (argList match {
-    //       case Some(a: Argument[Unit]) => a.minOccurs > 0
-    //       case _ => false
-    //     }))) {
-    //   System.err.println("Error: missing arguments: " + argumentNames.mkString(", "))
-    //   _error = true
-    // }
-    // if (_error) {
-    //   showUsage
-    //   None
-    // }
-    // else Some(_config)
-
-    None
+    (pendingOptions filter { opt => opt.getMinOccurs > occurrences(opt) }) foreach { opt =>
+      if (opt.getMinOccurs == 1) System.err.println("Error: Missing option " + opt.fullName)
+      else System.err.println("Error: Option " + opt.fullName + " must be given " + opt.getMinOccurs + " times")
+      _error = true
+    }
+    (pendingArgs filter { arg => arg.getMinOccurs > occurrences(arg) }) foreach { arg =>
+      if (arg.getMinOccurs == 1) System.err.println("Error: Missing argument " + arg.name)
+      else System.err.println("Error: Argument '" + arg.name + "' must be given " + arg.getMinOccurs + " times")
+      _error = true
+    }
+    if (_error) {
+      showUsage
+      None
+    }
+    else Some(_config)
   }
 }

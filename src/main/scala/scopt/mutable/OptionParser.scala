@@ -58,6 +58,13 @@ case class OptionParser(
     /** Adds short option -x. */
     def shortOpt(x: Char): OptionDef[A] =
       updateOption(copy(_shortOpt = Some(x)))
+    /** Requires the option to appear at least `n` times. */
+    def minOccurs(n: Int): OptionDef[A] =
+      updateOption(copy(_minOccurs = n))
+    /** Requires the option to appear at least once. */
+    def required(): OptionDef[A] = minOccurs(1)
+    /** Chanages the option to be optional. */
+    def optional(): OptionDef[A] = minOccurs(0)
     /** Allows the argument to appear at most `n` times. */
     def maxOccurs(n: Int): OptionDef[A] =
       updateOption(copy(_maxOccurs = n))
@@ -90,7 +97,6 @@ case class OptionParser(
       case None    => false
     }
 
-  // -------- Defining options ---------------
   protected def add[A: Read](option: OptionDef[A]): OptionDef[A] = {
     options += option
     option
@@ -131,23 +137,5 @@ case class OptionParser(
    * @param name0 name in the usage text
    */  
   def arg[A: Read](name0: String): OptionDef[A] =
-    add(OptionDef[A](id = generateId, kind = Arg, name = name0))
-
-  // /** adds an optional argument invoked by an option without `-` or `--`.
-  //  * @param name name in the usage text
-  //  * @param description description in the usage text
-  //  * @param action callback function
-  //  */  
-  // def argOpt(name: String, description: String, action: String => Unit) =
-  //   add(new Argument(name, description, 0, 1,
-  //     { (s: String, _) => action(s) }))
-
-  // /** adds an optional list of arguments invoked by options without `-` or `--`.
-  //  * @param name name in the usage text
-  //  * @param description description in the usage text
-  //  * @param action callback function
-  //  */
-  // def arglistOpt(name: String, description: String, action: String => Unit) =
-  //   add(new Argument(name, description, 0, UNBOUNDED,
-  //     { (s: String, _) => action(s) }))
+    add(OptionDef[A](id = generateId, kind = Arg, name = name0)) required()
 }
