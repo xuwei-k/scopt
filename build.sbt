@@ -1,6 +1,6 @@
 name := "scopt"
 
-version := "2.1.0"
+version := "3.0.0-SNAPSHOT"
 
 organization := "com.github.scopt"
 
@@ -12,7 +12,7 @@ description := """a command line options parsing library"""
 
 scalaVersion := "2.10.1"
 
-crossScalaVersions := Seq("2.10.1", "2.9.2")
+crossScalaVersions := Seq("2.10.1", "2.9.2", "2.9.3")
 
 crossVersion <<= scalaVersion { sv =>
   ("-(M|RC)".r findFirstIn sv) map {_ => CrossVersion.full} getOrElse CrossVersion.binary
@@ -20,7 +20,7 @@ crossVersion <<= scalaVersion { sv =>
 
 // scalatest
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
-	val versionMap = Map("2.9.2" -> "1.12.3", "2.10.1" -> "2.0-RC1")
+	val versionMap = Map("2.9.3" -> "1.12.5-SNAPSHOT", "2.9.2" -> "1.12.3", "2.10.1" -> "2.0-RC1")
 	val testVersion = versionMap.getOrElse(sv, error("Unsupported Scala version " + sv))
 	deps :+ ("org.specs2" %% "specs2" % testVersion % "test")
 }

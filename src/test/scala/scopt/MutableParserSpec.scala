@@ -229,7 +229,7 @@ class MutableParserSpec extends Specification { def is =      s2"""
       libName: String = "", maxCount: Int = -1, verbose: Boolean = false,
       mode: String = "", files: Seq[String] = Seq())
     var c = Config()    
-    val parser = new scopt.OptionParser("scopt", "3.x") {
+    val parser = new scopt.mutable.OptionParser("scopt", "3.x") {
       opt[Int]('f', "foo") action { x =>
         c = c.copy(foo = x) } text("foo is an integer property")
       opt[String]('o', "out") required() valueName("<file>") action { x =>
