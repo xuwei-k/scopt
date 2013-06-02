@@ -79,11 +79,11 @@ private[scopt] trait GenericOptionParser[C] {
   /** adds usage text. */
   def note(x: String): Def[Unit] = makeDef[Unit](Sep, "") text(x)
 
-  /** adds an argument invoked by and option without `-` or `--`.
+  /** adds an argument invoked by an option without `-` or `--`.
    * @param name0 name in the usage text
    */  
   def arg[A: Read](name: String): Def[A] = makeDef(Arg, name)
-  
+
   def usage: String = {
     import OptionDefinition._
     val prorgamText = programName map { _ + " " } getOrElse { "" }
@@ -225,7 +225,7 @@ private[scopt] trait GenericOptionParser[C] {
         }
       }
     }
-    // number of tokens to read: 0 or no match, 2 for "--foo 1", 1 for "--foo:1"
+    // number of tokens to read: 0 for no match, 2 for "--foo 1", 1 for "--foo:1"
     def shortOptTokens(arg: String): Int =
       _shortOpt match {
         case Some(c) if arg == "-" + shortOptOrBlank                 => 1 + read.tokensToRead
