@@ -43,6 +43,8 @@ abstract case class OptionParser[C](
     errorOnUnknownArgument: Boolean = true) extends GenericOptionParser[C] {
   import OptionDefinition._
 
+  type Def[A] = OptionDef[A]
+  
   def this() = this(None, None, true)
   def this(programName: String) = this(Some(programName), None, true)
   def this(programName: String, version: String) = this(Some(programName), Some(version), true)
@@ -61,7 +63,7 @@ abstract case class OptionParser[C](
     _action: (A, C) => C = { (a: A, c: C) => c },
     _validations: Seq[A => Either[String, Unit]] = Seq(),
     _minOccurs: Int = 0,
-    _maxOccurs: Int = 1) extends OptionDefinition[A, C] {    
+    _maxOccurs: Int = 1) extends OptionDefinition[A, C] {
     /** Adds callback function. */
     def action(f: (A, C) => C): OptionDef[A] =
       copy(_action = (a: A, c: C) => { f(a, _action(a, c)) })
@@ -72,9 +74,9 @@ abstract case class OptionParser[C](
     def minOccurs(n: Int): OptionDef[A] =
       copy(_minOccurs = n)
     /** Requires the option to appear at least once. */
-    def required(): OptionDef[A] = minOccurs(1)
+    def required(): Def[A] = minOccurs(1)
     /** Chanages the option to be optional. */
-    def optional(): OptionDef[A] = minOccurs(0)
+    def optional(): Def[A] = minOccurs(0)
     /** Allows the argument to appear at most `n` times. */
     def maxOccurs(n: Int): OptionDef[A] =
       copy(_maxOccurs = n)
@@ -101,32 +103,12 @@ abstract case class OptionParser[C](
     def getMaxOccurs: Int = _maxOccurs
   }
 
-  /** adds an option invoked by `--name x`.
-   * @param name0 name of the option
-   */
-  def opt[A: Read](name0: String): OptionDef[A] =
-    OptionDef[A](id = generateId, kind = Opt, name = name0)
-
-  /** adds an option invoked by `-x value` or `--name value`.
-   * @param x name of the short option
-   * @param name0 name of the option
-   */
-  def opt[A: Read](x: Char, name0: String): OptionDef[A] =
-    opt[A](name0) shortOpt(x)
+  protected def makeDef[A: Read](kind: OptionDefKind, name: String): Def[A] =
+    OptionDef[A](id = generateId, kind = kind, name = name)
 
   /** adds an option invoked by `--name` that displays usage text.
    * @param name0 name of the option
    */
   def help(name0: String): OptionDef[Unit] =
     opt[Unit](name0) action { (x, c) => showUsage; c }
-  
-  /** adds usage text. */
-  def note(x: String) =
-    OptionDef[Unit](id = generateId, kind = Sep, name = "", _desc = x)
-  
-  /** adds an argument invoked by and option without `-` or `--`.
-   * @param name0 name in the usage text
-   */  
-  def arg[A: Read](name0: String): OptionDef[A] =
-    OptionDef[A](id = generateId, kind = Arg, name = name0)
 }

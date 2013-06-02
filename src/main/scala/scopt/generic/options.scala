@@ -50,137 +50,40 @@ case object Opt extends OptionDefKind
 case object Arg extends OptionDefKind
 case object Sep extends OptionDefKind
 
-private[scopt] abstract class OptionDefinition[A: Read, C] {
-  import OptionDefinition._
-
-  def read: Read[A] = implicitly[Read[A]]
-  def kind: OptionDefKind
-  def name: String
-  def _shortOpt: Option[Char]
-  def _keyName: Option[String]
-  def _valueName: Option[String]
-  def _desc: String
-  def shortOptOrBlank: String = _shortOpt map {_.toString} getOrElse("")
-  def _validations: Seq[A => Either[String, Unit]]
-  def getMaxOccurs: Int
-  def getMinOccurs: Int
-
-  def callback: (A, C) => C
-  def applyArgument(arg: String, config: C): Either[Seq[String], C] =
-    try {
-      val x = read.reads(arg)
-      validate(x) match {
-        case Right(_) => Right(callback(x, config))
-        case Left(xs) => Left(xs)
-      }
-    } catch {
-      case e: NumberFormatException => Left(Seq(shortDescription.capitalize + " expects a number but was given '" + arg + "'"))
-      case e: Throwable             => Left(Seq(shortDescription.capitalize + " failed when given '" + arg + "'. " + e.getMessage))
-    }
-  def validate(value: A): Either[Seq[String], Unit] = {
-    val results = _validations map {_.apply(value)}
-    (success[Seq[String]] /: results) { (acc, r) =>
-      (acc match {
-        case Right(_) => Seq[String]()
-        case Left(xs) => xs
-      }) ++ (r match {
-        case Right(_) => Seq[String]()
-        case Left(x)  => Seq[String](x)
-      }) match {
-        case Seq()    => acc
-        case xs       => Left(xs)
-      }
-    }
-  }
-  // number of tokens to read: 0 or no match, 2 for "--foo 1", 1 for "--foo:1"
-  def shortOptTokens(arg: String): Int =
-    _shortOpt match {
-      case Some(c) if arg == "-" + shortOptOrBlank                 => 1 + read.tokensToRead
-      case Some(c) if arg startsWith ("-" + shortOptOrBlank + ":") => 1
-      case _ => 0
-    }
-  def longOptTokens(arg: String): Int =
-    if (arg == fullName) 1 + read.tokensToRead
-    else if (arg startsWith (fullName + ":")) 1
-    else 0
-  def tokensToRead(i: Int, args: Seq[String]): Int =
-    if (i >= args.length || kind != Opt) 0
-    else args(i) match {
-      case arg if longOptTokens(arg) > 0  => longOptTokens(arg)
-      case arg if shortOptTokens(arg) > 0 => shortOptTokens(arg) 
-      case _ => 0
-    }
-  def apply(i: Int, args: Seq[String]): Either[String, String] =
-    if (i >= args.length || kind != Opt) Left("Option does not match")
-    else args(i) match {
-      case arg if longOptTokens(arg) == 2 || shortOptTokens(arg) == 2 =>
-        token(i + 1, args) map {Right(_)} getOrElse Left("Missing value after " + arg)
-      case arg if longOptTokens(arg) == 1 && read.tokensToRead == 1 =>
-        Right(arg drop (fullName + ":").length)
-      case arg if shortOptTokens(arg) == 1 && read.tokensToRead == 1 =>
-        Right(arg drop ("-" + shortOptOrBlank + ":").length)
-      case _ => Right("")
-    }
-  def token(i: Int, args: Seq[String]): Option[String] =
-    if (i >= args.length || kind != Opt) None
-    else Some(args(i))
-  def usage: String =
-    kind match {
-      case Sep => _desc
-      case Arg => name + NLTB + _desc
-      case Opt if read.arity == 2 =>
-        (_shortOpt map { o => "-" + o + ":" + keyValueString + " | " } getOrElse { "" }) +
-        fullName + ":" + keyValueString + NLTB + _desc
-      case Opt if read.arity == 1 =>
-        (_shortOpt map { o => "-" + o + " " + valueString + " | " } getOrElse { "" }) +
-        fullName + " " + valueString + NLTB + _desc
-      case Opt =>
-        (_shortOpt map { o => "-" + o + " | " } getOrElse { "" }) + 
-        fullName + NLTB + _desc    
-    }    
-  def keyValueString: String = (_keyName getOrElse defaultKeyName) + "=" + valueString 
-  def valueString: String = (_valueName getOrElse defaultValueName)
-  def shortDescription: String =
-    kind match {
-      case Opt => "option " + fullName
-      case _   => "argument " + fullName
-    }
-  def fullName: String =
-    kind match {
-      case Opt => "--" + name
-      case _   => name
-    }
-  def argName: String =
-    kind match {
-      case Arg if getMinOccurs == 0 => "[" + fullName + "]" 
-      case _   => fullName
-    }
-}
-
-private[scopt] object OptionDefinition {
-  val UNBOUNDED = 1024
-  val NL = System.getProperty("line.separator")
-  val TB = "        "
-  val NLTB = NL + TB
-  val NLNL = NL + NL
-  val defaultKeyName = "<key>"
-  val defaultValueName = "<value>"
-  val atomic = new java.util.concurrent.atomic.AtomicInteger
-  def generateId: Int = atomic.incrementAndGet
-  def success[A]: Either[A, Unit] = Right(())
-}
-
 private[scopt] trait GenericOptionParser[C] {
-  def options: Seq[OptionDefinition[_, C]]
+  type Def[A] <: OptionDefinition[A, C]
+
+  def options: Seq[Def[_]]
   def version: Option[String]
   def programName: Option[String]
   def errorOnUnknownArgument: Boolean
-  def success: Either[String, Unit] = OptionDefinition.success[String]
+  def success: Either[String, Unit] = OptionDefinition.makeSuccess[String]
   def failure(msg: String): Either[String, Unit] = Left(msg)
 
-  protected def nonArgs: Seq[OptionDefinition[_, C]] = options filter {_.kind != Arg}
-  protected def arguments: Seq[OptionDefinition[_, C]] = options filter {_.kind == Arg}
+  protected def makeDef[A: Read](kind: OptionDefKind, name: String): Def[A]
+  protected def nonArgs: Seq[Def[_]] = options filter {_.kind != Arg}
+  protected def arguments: Seq[Def[_]] = options filter {_.kind == Arg}
 
+  /** adds an option invoked by `--name x`.
+   * @param name0 name of the option
+   */
+  def opt[A: Read](name: String): Def[A] = makeDef(Opt, name)
+
+  /** adds an option invoked by `-x value` or `--name value`.
+   * @param x name of the short option
+   * @param name0 name of the option
+   */
+  def opt[A: Read](x: Char, name0: String): Def[A] =
+    opt[A](name0) shortOpt(x)
+
+  /** adds usage text. */
+  def note(x: String): Def[Unit] = makeDef[Unit](Sep, "") text(x)
+
+  /** adds an argument invoked by and option without `-` or `--`.
+   * @param name0 name in the usage text
+   */  
+  def arg[A: Read](name: String): Def[A] = makeDef(Arg, name)
+  
   def usage: String = {
     import OptionDefinition._
     val prorgamText = programName map { _ + " " } getOrElse { "" }
@@ -273,5 +176,130 @@ private[scopt] trait GenericOptionParser[C] {
       None
     }
     else Some(_config)
+  }
+
+  private[scopt] abstract class OptionDefinition[A: Read, C] {
+    import OptionDefinition._
+  
+    def read: Read[A] = implicitly[Read[A]]
+    def kind: OptionDefKind
+    def name: String
+    def _shortOpt: Option[Char]
+    def _keyName: Option[String]
+    def _valueName: Option[String]
+    def _desc: String
+    def shortOptOrBlank: String = _shortOpt map {_.toString} getOrElse("")
+    def _validations: Seq[A => Either[String, Unit]]
+    def getMaxOccurs: Int
+    def getMinOccurs: Int
+
+    def shortOpt(x: Char): Def[A]
+    def minOccurs(n: Int): Def[A]
+    def maxOccurs(n: Int): Def[A]
+    def text(x: String): Def[A]
+
+    def callback: (A, C) => C
+    def applyArgument(arg: String, config: C): Either[Seq[String], C] =
+      try {
+        val x = read.reads(arg)
+        validate(x) match {
+          case Right(_) => Right(callback(x, config))
+          case Left(xs) => Left(xs)
+        }
+      } catch {
+        case e: NumberFormatException => Left(Seq(shortDescription.capitalize + " expects a number but was given '" + arg + "'"))
+        case e: Throwable             => Left(Seq(shortDescription.capitalize + " failed when given '" + arg + "'. " + e.getMessage))
+      }
+    def validate(value: A): Either[Seq[String], Unit] = {
+      val results = _validations map {_.apply(value)}
+      (makeSuccess[Seq[String]] /: results) { (acc, r) =>
+        (acc match {
+          case Right(_) => Seq[String]()
+          case Left(xs) => xs
+        }) ++ (r match {
+          case Right(_) => Seq[String]()
+          case Left(x)  => Seq[String](x)
+        }) match {
+          case Seq()    => acc
+          case xs       => Left(xs)
+        }
+      }
+    }
+    // number of tokens to read: 0 or no match, 2 for "--foo 1", 1 for "--foo:1"
+    def shortOptTokens(arg: String): Int =
+      _shortOpt match {
+        case Some(c) if arg == "-" + shortOptOrBlank                 => 1 + read.tokensToRead
+        case Some(c) if arg startsWith ("-" + shortOptOrBlank + ":") => 1
+        case _ => 0
+      }
+    def longOptTokens(arg: String): Int =
+      if (arg == fullName) 1 + read.tokensToRead
+      else if (arg startsWith (fullName + ":")) 1
+      else 0
+    def tokensToRead(i: Int, args: Seq[String]): Int =
+      if (i >= args.length || kind != Opt) 0
+      else args(i) match {
+        case arg if longOptTokens(arg) > 0  => longOptTokens(arg)
+        case arg if shortOptTokens(arg) > 0 => shortOptTokens(arg) 
+        case _ => 0
+      }
+    def apply(i: Int, args: Seq[String]): Either[String, String] =
+      if (i >= args.length || kind != Opt) Left("Option does not match")
+      else args(i) match {
+        case arg if longOptTokens(arg) == 2 || shortOptTokens(arg) == 2 =>
+          token(i + 1, args) map {Right(_)} getOrElse Left("Missing value after " + arg)
+        case arg if longOptTokens(arg) == 1 && read.tokensToRead == 1 =>
+          Right(arg drop (fullName + ":").length)
+        case arg if shortOptTokens(arg) == 1 && read.tokensToRead == 1 =>
+          Right(arg drop ("-" + shortOptOrBlank + ":").length)
+        case _ => Right("")
+      }
+    def token(i: Int, args: Seq[String]): Option[String] =
+      if (i >= args.length || kind != Opt) None
+      else Some(args(i))
+    def usage: String =
+      kind match {
+        case Sep => _desc
+        case Arg => name + NLTB + _desc
+        case Opt if read.arity == 2 =>
+          (_shortOpt map { o => "-" + o + ":" + keyValueString + " | " } getOrElse { "" }) +
+          fullName + ":" + keyValueString + NLTB + _desc
+        case Opt if read.arity == 1 =>
+          (_shortOpt map { o => "-" + o + " " + valueString + " | " } getOrElse { "" }) +
+          fullName + " " + valueString + NLTB + _desc
+        case Opt =>
+          (_shortOpt map { o => "-" + o + " | " } getOrElse { "" }) + 
+          fullName + NLTB + _desc    
+      }    
+    def keyValueString: String = (_keyName getOrElse defaultKeyName) + "=" + valueString 
+    def valueString: String = (_valueName getOrElse defaultValueName)
+    def shortDescription: String =
+      kind match {
+        case Opt => "option " + fullName
+        case _   => "argument " + fullName
+      }
+    def fullName: String =
+      kind match {
+        case Opt => "--" + name
+        case _   => name
+      }
+    def argName: String =
+      kind match {
+        case Arg if getMinOccurs == 0 => "[" + fullName + "]" 
+        case _   => fullName
+      }
+  }
+
+  private[scopt] object OptionDefinition {
+    val UNBOUNDED = 1024
+    val NL = System.getProperty("line.separator")
+    val TB = "        "
+    val NLTB = NL + TB
+    val NLNL = NL + NL
+    val defaultKeyName = "<key>"
+    val defaultValueName = "<value>"
+    val atomic = new java.util.concurrent.atomic.AtomicInteger
+    def generateId: Int = atomic.incrementAndGet
+    def makeSuccess[A]: Either[A, Unit] = Right(())
   }
 }
