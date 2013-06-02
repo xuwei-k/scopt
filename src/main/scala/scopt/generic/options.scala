@@ -72,8 +72,8 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
     try {
       Right(callback(read.reads(arg), config))
     } catch {
-      case e: NumberFormatException => Left(shortDescription + " expects a number but was given '" + arg + "'")
-      case e: Throwable             => Left(shortDescription + " failed when given '" + arg + "'. " + e.getMessage)
+      case e: NumberFormatException => Left(shortDescription.capitalize + " expects a number but was given '" + arg + "'")
+      case e: Throwable             => Left(shortDescription.capitalize + " failed when given '" + arg + "'. " + e.getMessage)
     }
   // number of tokens to read: 0 or no match, 2 for "--foo 1", 1 for "--foo:1"
   def shortOptTokens(arg: String): Int =
@@ -233,13 +233,13 @@ private[scopt] trait GenericOptionParser[C] {
       i += 1
     }
     (pendingOptions filter { opt => opt.getMinOccurs > occurrences(opt) }) foreach { opt =>
-      if (opt.getMinOccurs == 1) System.err.println("Error: Missing option " + opt.fullName)
-      else System.err.println("Error: Option " + opt.fullName + " must be given " + opt.getMinOccurs + " times")
+      if (opt.getMinOccurs == 1) System.err.println("Error: Missing " + opt.shortDescription)
+      else System.err.println("Error: " + opt.shortDescription.capitalize + " must be given " + opt.getMinOccurs + " times")
       _error = true
     }
     (pendingArgs filter { arg => arg.getMinOccurs > occurrences(arg) }) foreach { arg =>
-      if (arg.getMinOccurs == 1) System.err.println("Error: Missing argument " + arg.name)
-      else System.err.println("Error: Argument '" + arg.name + "' must be given " + arg.getMinOccurs + " times")
+      if (arg.getMinOccurs == 1) System.err.println("Error: Missing " + arg.shortDescription)
+      else System.err.println("Error: '" + arg.shortDescription.capitalize + "' must be given " + arg.getMinOccurs + " times")
       _error = true
     }
     if (_error) {
