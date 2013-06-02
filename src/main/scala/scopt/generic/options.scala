@@ -1,11 +1,7 @@
 package scopt.generic
 
-import GenericOptionParser.UNBOUNDED
-
-trait OptionDefKind {}
-case object Opt extends OptionDefKind
-case object Arg extends OptionDefKind
-case object Sep extends OptionDefKind
+import GenericOptionParser.{UNBOUNDED, defaultValueName}
+import collection.mutable.{ListBuffer, ListMap}
 
 trait Read[A] {
   def tokensToRead: Int 
@@ -47,19 +43,24 @@ object Read {
   }
 }
 
+trait OptionDefKind {}
+case object Opt extends OptionDefKind
+case object Arg extends OptionDefKind
+case object Sep extends OptionDefKind
+
 private[scopt] abstract class OptionDefinition[A: Read, C] {
   def read: Read[A] = implicitly[Read[A]]
   def kind: OptionDefKind
-  def name: Option[String]
-  def nameOrBlank: String = name.getOrElse("")
+  def name: String
   def _shortOpt: Option[Char]
   def shortOptOrBlank: String = _shortOpt map {_.toString} getOrElse("")
-  def maxOccurs: Int
-  def minOccurs: Int
+  def getMaxOccurs: Int
+  def getMinOccurs: Int
+  def _valueName: Option[String]
   def shortDescription: String =
     kind match {
-      case Opt => "option " + nameOrBlank
-      case _   => "argument " + nameOrBlank
+      case Opt => "option " + name
+      case _   => "argument " + name
     }
   def callback: (A, C) => C
   def applyArgument(arg: String, config: C): Option[C]  =
@@ -81,8 +82,8 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
       case _ => 0
     }
   def longOptTokens(arg: String): Int =
-    if (arg == "--" + nameOrBlank) 1 + read.tokensToRead
-    else if (arg startsWith ("--" + nameOrBlank + ":")) 1
+    if (arg == "--" + name) 1 + read.tokensToRead
+    else if (arg startsWith ("--" + name + ":")) 1
     else 0
   def tokensToRead(i: Int, args: Seq[String]): Int =
     if (i >= args.length || kind != Opt) 0
@@ -97,7 +98,7 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
       case arg if longOptTokens(arg) == 2 || shortOptTokens(arg) == 2 =>
         token(i + 1, args) map {Right(_)} getOrElse Left("Missing value after '" + arg + "'")
       case arg if longOptTokens(arg) == 1 && read.tokensToRead == 1 =>
-        Right(arg drop ("--" + nameOrBlank + ":").length)
+        Right(arg drop ("--" + name + ":").length)
       case arg if shortOptTokens(arg) == 1 && read.tokensToRead == 1 =>
         Right(arg drop ("-" + shortOptOrBlank + ":").length)
       case _ => Right("")
@@ -113,27 +114,14 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
 //         ) extends OptionDefinition[C](false, null, null, null, null,
 //           description, { (a: String, c: C) => c }, false, false, 1, 1)
 
-// private[scopt] class Argument[C](
-//         name: String,
-//         description: String,
-//         minOccurs: Int,
-//         maxOccurs: Int,
-//         action: (String, C) => C
-//         ) extends OptionDefinition[C](false, null, name, null, name, 
-//           description, action, false, false, minOccurs, maxOccurs) {
-
-//   override def shortDescription = "argument " + name
-// }
-
 private[scopt] trait GenericOptionParser[C] {
   def options: Seq[OptionDefinition[_, C]]
   def version: Option[String]
   def programName: Option[String]
   def errorOnUnknownArgument: Boolean
 
-  protected def opts: Seq[OptionDefinition[_, C]] = options filter {_.kind != Arg}
-  protected def arguments: Seq[OptionDefinition[_, C]] = options filter { opt => (opt.kind == Arg) && opt.maxOccurs <= 1 }
-  protected def argList: Option[OptionDefinition[_, C]] = options filter { opt => (opt.kind == Arg) && opt.maxOccurs > 1 } headOption
+  protected def opts: Seq[OptionDefinition[_, C]] = options filter {_.kind == Opt}
+  protected def arguments: Seq[OptionDefinition[_, C]] = options filter {_.kind == Arg}
 
 //   import GenericOptionParser._
 
@@ -155,85 +143,68 @@ private[scopt] trait GenericOptionParser[C] {
 //     case None                 => arguments.map(a => a.valueName + NLTB + a.description)
 //   })
   
-//   def usage: String = {
-//     val prorgamText = programName map { _ + " " } getOrElse { "" }
-//     val versionText = programName map { pg =>
-//       version map { NL + pg + " " + _ } getOrElse { "" }
-//     } getOrElse { "" }
-//     val optionText = if (opts.isEmpty) {""} else {"[options] "}
-//     val argumentList = argumentNames.mkString(" ")
+  def descriptions = Nil
 
-//     versionText + NL + "Usage: " + prorgamText + optionText + argumentList + NLNL +
-//     "  " + descriptions.mkString(NL + "  ") + NL
-//   }
+  def usage: String = {
+    import GenericOptionParser._
+    val prorgamText = programName map { _ + " " } getOrElse { "" }
+    val versionText = programName map { pg =>
+      version map { NL + pg + " " + _ } getOrElse { "" }
+    } getOrElse { "" }
+    val optionText = if (opts.isEmpty) {""} else {"[options] "}
+    val argumentList = arguments map {_.name} mkString(" ")
 
-//   def showUsage = Console.err.println(usage)
+    versionText + NL + "Usage: " + prorgamText + optionText + argumentList + NLNL +
+    "  " + descriptions.mkString(NL + "  ") + NL
+  }
 
-//   private def argumentNames: Seq[String] = argList match {
-//     case Some(x: Argument[C]) => List(x.valueName)
-//     case None                 => arguments.map(_.valueName)
-//   }
-  
+  def showUsage = Console.err.println(usage)
+    
   /** parses the given `args`.
    */
   def parse(args: Seq[String], init: C): Option[C] = {
-    import collection.mutable.ListBuffer
-
     var i = 0
-    val unseenArgs = ListBuffer() ++ arguments
-    var argListCount = 0
+    val pendingArgs = ListBuffer() ++ arguments
+    val occurrences = ListMap[OptionDefinition[_, C], Int]().withDefaultValue(0)
     var _config: C = init
     var _error = false
 
+    def handleError(msg: String) {
+      if (errorOnUnknownArgument) {
+        System.err.println("Error: " + msg)
+        _error = true
+      }
+      else System.err.println("Warning: " + msg)
+    }
+    def handleArgument(opt: OptionDefinition[_, C], arg: String) {
+      opt.applyArgument(arg, _config) match {
+        case Some(c) => _config = c
+        case None    => _error = true
+      }
+    }
     while (i < args.length) {
-      val arg = args(i)
-
       opts.find(_.tokensToRead(i, args) > 0) match {
-        case None =>
-      //     if (arg.startsWith("-")) {
-      //       if (errorOnUnknownArgument) {
-      //         System.err.println("Error: Unknown argument '" + arg + "'")
-      //         _error = true              
-      //       } else
-      //         System.err.println("Warning: Unknown argument '" + arg + "'")
-      //     } else if (argList.isDefined) {
-      //       argListCount += 1
-      //       applyArgument(argList.get, arg, _config) match {
-      //         case Some(c) => _config = c
-      //         case None    => _error = true
-      //       }
-      //     } else if (unseenArgs.isEmpty) {
-      //       if (errorOnUnknownArgument) {
-      //         System.err.println("Error: Unknown argument '" + arg + "'")
-      //         _error = true             
-      //       } else
-      //         System.err.println("Warning: Unknown argument '" + arg + "'")
-      //     } else {
-      //       val first = unseenArgs.remove(0)
-      //       applyArgument(first, arg, _config) match {
-      //         case Some(c) => _config = c
-      //         case None    => _error = true
-      //       }
-      //     }
-          
         case Some(option) =>
           option(i, args) match {
-            case Right(value) =>
-              option.applyArgument(value, _config) match {
-                case Some(c) => _config = c
-                case None    => _error = true
-              }
-            case Left(outOfBounds) =>
-              if (errorOnUnknownArgument) {
-                System.err.println("Error: " + outOfBounds)
-                _error = true
-              }
-              else System.err.println("Warning: " + outOfBounds)
+            case Right(v) =>          handleArgument(option, v)
+            case Left(outOfBounds) => handleError(outOfBounds)
           }
           // move index forward for gobbling
           if (option.tokensToRead(i, args) > 1) {
             i += option.tokensToRead(i, args) - 1
           } // if
+        case None =>
+          args(i) match {
+            case arg if arg startsWith "-"  => handleError("Unknown argument '" + arg + "'")
+            case arg if pendingArgs.isEmpty => handleError("Unknown argument '" + arg + "'")
+            case arg =>
+              val first = pendingArgs.head
+              occurrences(first) += 1
+              if (occurrences(first) >= first.getMaxOccurs) {
+                pendingArgs.remove(0)
+              }
+              handleArgument(first, arg)
+          }
       }
       i += 1
     }
@@ -264,10 +235,6 @@ private[scopt] object GenericOptionParser {
   val NLNL = NL + NL
   val defaultKeyName = "<key>"
   val defaultValueName = "<value>"
-  var currentId = 0
-  def generateId: Int = {
-    val retval = currentId
-    currentId = currentId + 1
-    retval
-  }
+  val atomic = new java.util.concurrent.atomic.AtomicInteger
+  def generateId: Int = atomic.incrementAndGet
 }

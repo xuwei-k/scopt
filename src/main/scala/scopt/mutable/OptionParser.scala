@@ -44,25 +44,29 @@ case class OptionParser(
   case class OptionDef[A: Read](
     id: Int,
     kind: OptionDefKind,
+    name: String,
     _shortOpt: Option[Char] = None,
-    name: Option[String] = None,
     _keyName: Option[String] = None,
     _valueName: Option[String] = None,
     _description: Option[String] = None,
     _action: (A => Unit) = { (a: A) => () },
-    _minOccurs: Int = 1,
-    _maxOccurs: Int = 1) extends OptionDefinition[A, Unit] {
-    def callback: (A, Unit) => Unit =
-      { (a, c) => _action(a) }
-    
+    _minOccurs: Int = 0,
+    _maxOccurs: Int = 1) extends OptionDefinition[A, Unit] {    
     /** Adds callback function. */
     def action(f: A => Unit): OptionDef[A] =
-      updateOption(copy(_action = (a: A) => { f(a) }))
+      updateOption(copy(_action = (a: A) => { _action(a); f(a) }))
     /** Adds short option -x. */
     def shortOpt(x: Char): OptionDef[A] =
       updateOption(copy(_shortOpt = Some(x)))
-    def minOccurs: Int = _minOccurs
-    def maxOccurs: Int = _maxOccurs
+    /** Allows the argument to appear at most `n` times. */
+    def maxOccurs(n: Int): OptionDef[A] =
+      updateOption(copy(_maxOccurs = n))
+    /** Allows the argument to appear multiple times. */
+    def unbounded(): OptionDef[A] = maxOccurs(UNBOUNDED)
+    def callback: (A, Unit) => Unit =
+      { (a, c) => _action(a) }
+    def getMinOccurs: Int = _minOccurs
+    def getMaxOccurs: Int = _maxOccurs
   }
 
   /** parses the given `args`.
@@ -88,29 +92,23 @@ case class OptionParser(
     option
   }
 
-
   /** adds an option invoked by `--name x`.
-   * @param name name of the option
+   * @param name0 name of the option
    */  
-  def opt[A: Read](name: String): OptionDef[A] =
-    add(OptionDef[A](id = generateId, kind = Opt, name = Some(name)))
-    
-  // def help(shortopt: String, longopt: String, description: String) =
-  //   add(new FlagOptionDefinition(Some(shortopt), longopt, description, {_ => this.showUsage; exit}))
+  def opt[A: Read](name0: String): OptionDef[A] =
+    add(OptionDef[A](id = generateId, kind = Opt, name = name0))
 
-  // def help(shortopt: Option[String], longopt: String, description: String) =
-  //   add(new FlagOptionDefinition(shortopt, longopt, description, {_ => this.showUsage; exit}))
-  
+  def help(name0: String): OptionDef[Unit] =
+    opt[Unit](name0) action {_ => showUsage}
+    
   // def separator(description: String) =
   //   add(new SeparatorDefinition(description))
-  
-  // /** adds an argument invoked by an option without `-` or `--`.
-  //  * @param name name in the usage text
-  //  * @param description description in the usage text
-  //  * @param action callback function
-  //  */  
-  // def arg(name: String, description: String, action: String => Unit) =
-  //   add(new Argument[Unit](name, description, 1, 1, { (s: String, _) => action(s) }))
+
+  /** adds an argument invoked by and option without `-` or `--`.
+   * @param name0 name in the usage text
+   */  
+  def arg[A: Read](name0: String): OptionDef[A] =
+    add(OptionDef[A](id = generateId, kind = Arg, name = name0))
 
   // /** adds an optional argument invoked by an option without `-` or `--`.
   //  * @param name name in the usage text
@@ -119,15 +117,6 @@ case class OptionParser(
   //  */  
   // def argOpt(name: String, description: String, action: String => Unit) =
   //   add(new Argument(name, description, 0, 1,
-  //     { (s: String, _) => action(s) }))
-      
-  // /** adds a list of arguments invoked by options without `-` or `--`.
-  //  * @param name name in the usage text
-  //  * @param description description in the usage text
-  //  * @param action callback function
-  //  */
-  // def arglist(name: String, description: String, action: String => Unit) =
-  //   add(new Argument(name, description, 1, UNBOUNDED,
   //     { (s: String, _) => action(s) }))
 
   // /** adds an optional list of arguments invoked by options without `-` or `--`.

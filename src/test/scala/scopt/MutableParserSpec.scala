@@ -26,7 +26,19 @@ class MutableParserSpec extends Specification { def is =      s2"""
 
   opt[(String, Int)]("foo") action { x => x } should
     parse ("k", 1) out of --foo k=1                             ${pairParser("--foo", "k=1")}
-    parse ("k", 1) out of --foo:k=1                             ${pairParser("--foo:k=1")}    
+    parse ("k", 1) out of --foo:k=1                             ${pairParser("--foo:k=1")}
+
+  arg[Int]("<port>") action { x => x } should
+    parse 80 out of 80                                          ${intArg("80")}
+
+  arg[String]("<a>"); arg[String]("<b>") action { x => x } should
+    parse "b" out of a b                                        ${multipleArgs("a", "b")}
+
+  arg[String]("<a>") action { x => x} unbounded(); arg[String]("<b>") should
+    parse "b" out of a b                                        ${unboundedArgs("a", "b")}
+
+  help("help") should
+    parse () out of --help                                      ${helpParser("--help")}       
                                                                 """
 
   def unitParser(args: String*) = {
@@ -85,5 +97,44 @@ class MutableParserSpec extends Specification { def is =      s2"""
     }
     parser.parse(args.toSeq)
     (foo === "k") and (value === 1)
+  }
+
+  def intArg(args: String*) = {
+    var port = 0
+    val parser = new scopt.OptionParser("scopt") {
+      arg[Int]("<port>") action { x => port = x }
+    }
+    parser.parse(args.toSeq)
+    port === 80
+  }
+
+  def multipleArgs(args: String*) = {
+    var a = ""
+    var b = ""
+    val parser = new scopt.OptionParser("scopt") {
+      arg[String]("<a>") action { x => a = x }
+      arg[String]("<b>") action { x => b = x }
+    }
+    parser.parse(args.toSeq)
+    (a === "a") and (b === "b")
+  }
+
+  def unboundedArgs(args: String*) = {
+    var a = ""
+    var b = ""
+    val parser = new scopt.OptionParser("scopt") {
+      arg[String]("<a>") action { x => a = x } unbounded()
+      arg[String]("<b>") action { x => b = x }
+    }
+    parser.parse(args.toSeq)
+    (a === "b") and (b === "")
+  }
+
+  def helpParser(args: String*) = {
+    val parser = new scopt.OptionParser("scopt") {
+      help("help")
+    }
+    parser.parse(args.toSeq)
+    success
   }
 }
