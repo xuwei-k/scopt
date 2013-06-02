@@ -137,5 +137,5 @@ case class OptionParser(
    * @param name0 name in the usage text
    */  
   def arg[A: Read](name0: String): OptionDef[A] =
-    add(OptionDef[A](id = generateId, kind = Arg, name = name0)) required()
+    add(OptionDef[A](id = generateId, kind = Arg, name = name0))
 }

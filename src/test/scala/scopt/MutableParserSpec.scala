@@ -31,9 +31,12 @@ class MutableParserSpec extends Specification { def is =      s2"""
     parse ("k", 1) out of --foo k=1                             ${pairParser("--foo", "k=1")}
     parse ("k", 1) out of --foo:k=1                             ${pairParser("--foo:k=1")}
 
-  arg[Int]("<port>") action { x => x } should
+  opt[String]("foo") required() action { x => x } should
+    fail to parse Nil                                           ${requiredFail()}
+
+  arg[Int]("<port>") required() action { x => x } should
     parse 80 out of 80                                          ${intArg("80")}
-    be required and should to parse Nil                         ${intArgFail()}
+    be required and should fail to parse Nil                    ${intArgFail()}
 
   arg[String]("<a>"); arg[String]("<b>") action { x => x } should
     parse "b" out of a b                                        ${multipleArgs("a", "b")}
@@ -103,10 +106,18 @@ class MutableParserSpec extends Specification { def is =      s2"""
     (foo === "k") and (value === 1)
   }
 
+  def requiredFail(args: String*) = {
+    var foo = ""
+    val parser = new scopt.OptionParser("scopt", "3.x") {
+      opt[String]("foo") required() action { x => foo = x }
+    }
+    parser.parse(args.toSeq) === false
+  }
+
   def intArg(args: String*) = {
     var port = 0
     val parser = new scopt.OptionParser("scopt", "3.x") {
-      arg[Int]("<port>") action { x => port = x }
+      arg[Int]("<port>") required() action { x => port = x }
     }
     parser.parse(args.toSeq)
     port === 80
@@ -115,7 +126,7 @@ class MutableParserSpec extends Specification { def is =      s2"""
   def intArgFail(args: String*) = {
     var port = 0
     val parser = new scopt.OptionParser("scopt", "3.x") {
-      arg[Int]("<port>") action { x => port = x }
+      arg[Int]("<port>") required() action { x => port = x }
     }
     parser.parse(args.toSeq) === false
   }
@@ -150,8 +161,8 @@ class MutableParserSpec extends Specification { def is =      s2"""
     val parser = new scopt.OptionParser("scopt", "3.x") {
       opt[Int]('f', "foo") action { x =>
         c = c.copy(foo = x) } text("foo is an integer property")
-      opt[String]('o', "out") valueName("<file>") action { x =>
-        c = c.copy(out = x) } text("out is a string property")
+      opt[String]('o', "out") required() valueName("<file>") action { x =>
+        c = c.copy(out = x) } text("out is a required string property")
       opt[Boolean]("xyz") action { x =>
         c = c.copy(xyz = x) } text("xyz is a boolean property")
       opt[(String, Int)]("max") action { case (k, v) =>
@@ -162,17 +173,17 @@ class MutableParserSpec extends Specification { def is =      s2"""
       note("some notes.\n")
       help("help") text("prints this usage text")
       arg[String]("<file>...") unbounded() action { x =>
-        c = c.copy(files = c.files :+ x) } text("some args")
+        c = c.copy(files = c.files :+ x) } text("optional unbounded args")
     }
     parser.parse(args.toSeq)
     parser.usage === """
 scopt 3.x
-Usage: scopt [options] <file>...
+Usage: scopt [options] [<file>...]
 
   -f <value> | --foo <value>
         foo is an integer property
   -o <file> | --out <file>
-        out is a string property
+        out is a required string property
   --xyz <value>
         xyz is a boolean property
   --max:<libname>=<max>
@@ -184,7 +195,7 @@ Usage: scopt [options] <file>...
   --help
         prints this usage text
   <file>...
-        some args
+        optional unbounded args
 """
   }
 }

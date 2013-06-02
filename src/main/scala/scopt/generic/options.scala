@@ -133,6 +133,11 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
       case Opt => "--" + name
       case _   => name
     }
+  def argName: String =
+    kind match {
+      case Arg if getMinOccurs == 0 => "[" + fullName + "]" 
+      case _   => fullName
+    }
 }
 
 private[scopt] object OptionDefinition {
@@ -163,7 +168,7 @@ private[scopt] trait GenericOptionParser[C] {
       version map { NL + pg + " " + _ } getOrElse { "" }
     } getOrElse { "" }
     val optionText = if (nonArgs.isEmpty) {""} else {"[options] "}
-    val argumentList = arguments map {_.name} mkString(" ")
+    val argumentList = arguments map {_.argName} mkString(" ")
     val descriptions = (nonArgs map {_.usage}) ++ (arguments map {_.usage})
 
     versionText + NL + "Usage: " + prorgamText + optionText + argumentList + NLNL +
