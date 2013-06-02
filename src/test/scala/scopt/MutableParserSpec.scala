@@ -13,7 +13,7 @@ class MutableParserSpec extends Specification { def is =      s2"""
     parse 1 out of -f 1                                         ${intParser("-f", "1")}
     parse 1 out of -f:1                                         ${intParser("-f:1")}
     fail to parse --foo                                         ${intParserFail{"--foo"}}
-    fail to parse --foo bar                                     ${intParserFail("--foo", "bar")}  
+    fail to parse --foo bar                                     ${intParserFail("--foo", "bar")}
 
   opt[String]("foo") action { x => x } should
     parse "bar" out of --foo bar                                ${stringParser("--foo", "bar")}
@@ -22,19 +22,27 @@ class MutableParserSpec extends Specification { def is =      s2"""
   opt[Double]("foo") action { x => x } should
     parse 1.0 out of --foo 1.0                                  ${doubleParser("--foo", "1.0")}
     parse 1.0 out of --foo:1.0                                  ${doubleParser("--foo:1.0")}
+    fail to parse --foo bar                                     ${doubleParserFail("--foo", "bar")}
 
   opt[Boolean]("foo") action { x => x } should
     parse true out of --foo true                                ${trueParser("--foo", "true")}
     parse true out of --foo:true                                ${trueParser("--foo:true")}
     parse true out of --foo 1                                   ${trueParser("--foo", "1")}
     parse true out of --foo:1                                   ${trueParser("--foo:1")}
+    fail to parse --foo bar                                     ${boolParserFail("--foo", "bar")}
 
   opt[(String, Int)]("foo") action { x => x } should
     parse ("k", 1) out of --foo k=1                             ${pairParser("--foo", "k=1")}
     parse ("k", 1) out of --foo:k=1                             ${pairParser("--foo:k=1")}
+    fail to parse --foo                                         ${pairParserFail("--foo")}
+    fail to parse --foo bar                                     ${pairParserFail("--foo", "bar")}
+    fail to parse --foo k=bar                                   ${pairParserFail("--foo", "k=bar")}
 
   opt[String]("foo") required() action { x => x } should
     fail to parse Nil                                           ${requiredFail()}
+
+  unknown options should
+    fail to parse by default                                    ${intParserFail("-z", "bar")}
 
   arg[Int]("<port>") required() action { x => x } should
     parse 80 out of 80                                          ${intArg("80")}
@@ -45,6 +53,7 @@ class MutableParserSpec extends Specification { def is =      s2"""
 
   arg[String]("<a>") action { x => x} unbounded(); arg[String]("<b>") should
     parse "b" out of a b                                        ${unboundedArgs("a", "b")}
+    parse nothing out of Nil                                    ${emptyArgs()}
 
   help("help") should
     print usage text --help                                     ${helpParser("--help")}       
@@ -94,6 +103,14 @@ class MutableParserSpec extends Specification { def is =      s2"""
     foo === 1.0
   }
 
+  def doubleParserFail(args: String*) = {
+    var foo = 0.0
+    val parser = new scopt.OptionParser("scopt", "3.x") {
+      opt[Double]("foo") action { x => foo = x }
+    }
+    parser.parse(args.toSeq) === false
+  }
+
   def trueParser(args: String*) = {
     var foo = false
     val parser = new scopt.OptionParser("scopt", "3.x") {
@@ -101,6 +118,14 @@ class MutableParserSpec extends Specification { def is =      s2"""
     }
     parser.parse(args.toSeq)
     foo === true
+  }
+
+  def boolParserFail(args: String*) = {
+    var foo = false
+    val parser = new scopt.OptionParser("scopt", "3.x") {
+      opt[Boolean]("foo") action { x => foo = x }
+    }
+    parser.parse(args.toSeq) === false
   }
 
   def pairParser(args: String*) = {
@@ -114,6 +139,18 @@ class MutableParserSpec extends Specification { def is =      s2"""
     }
     parser.parse(args.toSeq)
     (foo === "k") and (value === 1)
+  }
+
+  def pairParserFail(args: String*) = {
+    var foo = ""
+    var value = 0
+    val parser = new scopt.OptionParser("scopt", "3.x") {
+      opt[(String, Int)]("foo") action { case (k, v) =>
+        foo = k
+        value = v
+      }
+    }
+    parser.parse(args.toSeq) === false
   }
 
   def requiredFail(args: String*) = {
@@ -161,6 +198,16 @@ class MutableParserSpec extends Specification { def is =      s2"""
     }
     parser.parse(args.toSeq)
     (a === "b") and (b === "")
+  }
+
+  def emptyArgs(args: String*) = {
+    var a = ""
+    var b = ""
+    val parser = new scopt.OptionParser("scopt", "3.x") {
+      arg[String]("<a>") action { x => a = x } unbounded()
+      arg[String]("<b>") action { x => b = x }
+    }
+    parser.parse(args.toSeq) === true
   }
 
   def helpParser(args: String*) = {

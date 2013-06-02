@@ -25,7 +25,7 @@ object Read {
       case "1"     => true
       case "0"     => false
       case s       =>
-        throw new IllegalArgumentException(s + "is not a boolean.")
+        throw new IllegalArgumentException("'" + s + "' is not a boolean.")
     }}
   implicit def tupleRead[A1: Read, A2: Read]: Read[(A1, A2)] = new Read[(A1, A2)] {
     val tokensToRead = 1
@@ -97,7 +97,7 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
     if (i >= args.length || kind != Opt) Left("Option does not match")
     else args(i) match {
       case arg if longOptTokens(arg) == 2 || shortOptTokens(arg) == 2 =>
-        token(i + 1, args) map {Right(_)} getOrElse Left("Missing value after '" + arg + "'")
+        token(i + 1, args) map {Right(_)} getOrElse Left("Missing value after " + arg)
       case arg if longOptTokens(arg) == 1 && read.tokensToRead == 1 =>
         Right(arg drop (fullName + ":").length)
       case arg if shortOptTokens(arg) == 1 && read.tokensToRead == 1 =>
@@ -219,7 +219,7 @@ private[scopt] trait GenericOptionParser[C] {
           } // if
         case None =>
           args(i) match {
-            case arg if arg startsWith "-"  => handleError("Unknown argument '" + arg + "'")
+            case arg if arg startsWith "-"  => handleError("Unknown option " + arg)
             case arg if pendingArgs.isEmpty => handleError("Unknown argument '" + arg + "'")
             case arg =>
               val first = pendingArgs.head
