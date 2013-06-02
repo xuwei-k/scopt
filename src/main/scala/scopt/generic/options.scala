@@ -17,6 +17,29 @@ object Read {
   }
   implicit val intRead: Read[Int]             = reads { _.toInt }
   implicit val stringRead: Read[String]       = reads { identity }
+  implicit val doubleRead: Read[Double]       = reads { _.toDouble }
+  implicit val booleanRead: Read[Boolean]     =
+    reads { _.toLowerCase match {
+      case "true"  => true
+      case "false" => false
+      case "yes"   => true
+      case "no"    => false
+      case "1"     => true
+      case "0"     => false
+      case s       =>
+        throw new IllegalArgumentException(s + "is not a boolean.")
+    }}
+  implicit def tupleRead[A1: Read, A2: Read]: Read[(A1, A2)] =
+    reads {
+      splitKeyValue(_) match {
+        case (k, v) => implicitly[Read[A1]].reads(k) -> implicitly[Read[A2]].reads(v)
+      }
+    }
+  private def splitKeyValue(s: String): (String, String) =
+    s.indexOf('=') match {
+      case -1     => throw new IllegalArgumentException("Expected a key=value pair")
+      case n: Int => (s.slice(0, n), s.slice(n + 1, s.length))
+    }
 }
 
 private[scopt] abstract class OptionDefinition[A: Read, C] {
@@ -51,25 +74,6 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
         None
     }
 }
-
-// Base class for options.
-// These are things that get listed when we ask for help,
-// and optionally can accept string arguments & perform some kind of action,
-// usually mutating a var.
-// private[scopt] case class OptionDefinition[A, C](
-//   _canBeInvoked: Boolean = false,
-//   _shortopt: Option[String] = None,
-//   _longopt: Option[String] = None,
-//   _keyName: Option[String] = None,
-//   _valueName: Option[String] = None,
-//   _description: Option[String] = None,
-//   _action: ((A, C) => C) = (a, c) => c,
-//   _gobbleNextArgument: Boolean = false,
-//   _keyValueArgument: Boolean = false,
-//   _minOccurs: Int = 1,
-//   _maxOccurs: Int = 1) {
-//   def shortDescription = "option " + longopt
-// }
 
 // // ----- Some standard option types ---------
 // private[scopt] class SeparatorDefinition[C](
