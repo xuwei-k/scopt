@@ -1,15 +1,16 @@
 package scopt.generic
 
-import GenericOptionParser.{UNBOUNDED, defaultValueName}
 import collection.mutable.{ListBuffer, ListMap}
 
 trait Read[A] {
   def tokensToRead: Int 
+  def arity: Int
   def reads: String => A
 }
 object Read {
   def reads[A](f: String => A): Read[A] = new Read[A] {
     val tokensToRead = 1
+    val arity = 1
     val reads = f
   }
   implicit val intRead: Read[Int]             = reads { _.toInt }
@@ -26,12 +27,15 @@ object Read {
       case s       =>
         throw new IllegalArgumentException(s + "is not a boolean.")
     }}
-  implicit def tupleRead[A1: Read, A2: Read]: Read[(A1, A2)] =
-    reads {
-      splitKeyValue(_) match {
+  implicit def tupleRead[A1: Read, A2: Read]: Read[(A1, A2)] = new Read[(A1, A2)] {
+    val tokensToRead = 1
+    val arity = 2
+    val reads = { (s: String) =>
+      splitKeyValue(s) match {
         case (k, v) => implicitly[Read[A1]].reads(k) -> implicitly[Read[A2]].reads(v)
       }
     }
+  } 
   private def splitKeyValue(s: String): (String, String) =
     s.indexOf('=') match {
       case -1     => throw new IllegalArgumentException("Expected a key=value pair")
@@ -39,6 +43,7 @@ object Read {
     }
   implicit val unitRead: Read[Unit] = new Read[Unit] { 
     val tokensToRead = 0
+    val arity = 0
     val reads = { (s: String) => () }
   }
 }
@@ -49,19 +54,19 @@ case object Arg extends OptionDefKind
 case object Sep extends OptionDefKind
 
 private[scopt] abstract class OptionDefinition[A: Read, C] {
+  import OptionDefinition._
+
   def read: Read[A] = implicitly[Read[A]]
   def kind: OptionDefKind
   def name: String
   def _shortOpt: Option[Char]
+  def _keyName: Option[String]
+  def _valueName: Option[String]
+  def _desc: String
   def shortOptOrBlank: String = _shortOpt map {_.toString} getOrElse("")
   def getMaxOccurs: Int
   def getMinOccurs: Int
-  def _valueName: Option[String]
-  def shortDescription: String =
-    kind match {
-      case Opt => "option " + name
-      case _   => "argument " + name
-    }
+
   def callback: (A, C) => C
   def applyArgument(arg: String, config: C): Option[C]  =
     try {
@@ -106,13 +111,40 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
   def token(i: Int, args: Seq[String]): Option[String] =
     if (i >= args.length || kind != Opt) None
     else Some(args(i))
+  def usage: String =
+    kind match {
+      case Sep => _desc
+      case Arg => name + NLTB + _desc
+      case Opt if read.arity == 2 =>
+        (_shortOpt map { o => "-" + o + ":" + keyValueString + " | " } getOrElse { "" }) +
+        "--" + name + ":" + keyValueString + NLTB + _desc
+      case Opt if read.arity == 1 =>
+        (_shortOpt map { o => "-" + o + " " + valueString + " | " } getOrElse { "" }) +
+        "--" + name + " " + valueString + NLTB + _desc
+      case Opt =>
+        (_shortOpt map { o => "-" + o + " | " } getOrElse { "" }) + 
+        "--" + name + NLTB + _desc    
+    }    
+  def keyValueString: String = (_keyName getOrElse defaultKeyName) + "=" + valueString 
+  def valueString: String = (_valueName getOrElse defaultValueName)
+  def shortDescription: String =
+    kind match {
+      case Opt => "option " + name
+      case _   => "argument " + name
+    }
 }
 
-// // ----- Some standard option types ---------
-// private[scopt] class SeparatorDefinition[C](
-//         description: String
-//         ) extends OptionDefinition[C](false, null, null, null, null,
-//           description, { (a: String, c: C) => c }, false, false, 1, 1)
+private[scopt] object OptionDefinition {
+  val UNBOUNDED = 1024
+  val NL = System.getProperty("line.separator")
+  val TB = "        "
+  val NLTB = NL + TB
+  val NLNL = NL + NL
+  val defaultKeyName = "<key>"
+  val defaultValueName = "<value>"
+  val atomic = new java.util.concurrent.atomic.AtomicInteger
+  def generateId: Int = atomic.incrementAndGet
+}
 
 private[scopt] trait GenericOptionParser[C] {
   def options: Seq[OptionDefinition[_, C]]
@@ -120,39 +152,18 @@ private[scopt] trait GenericOptionParser[C] {
   def programName: Option[String]
   def errorOnUnknownArgument: Boolean
 
-  protected def opts: Seq[OptionDefinition[_, C]] = options filter {_.kind == Opt}
+  protected def nonArgs: Seq[OptionDefinition[_, C]] = options filter {_.kind != Arg}
   protected def arguments: Seq[OptionDefinition[_, C]] = options filter {_.kind == Arg}
 
-//   import GenericOptionParser._
-
-//   // -------- Getting usage information ---------------
-//   private def descriptions: Seq[String] = opts.map(opt => opt match {
-//     //case x: Argument => x.longopt + " :" + NLTB + opt.description
-//     case x if !x.canBeInvoked => x.description
-//     case x if x.keyValueArgument =>
-//       (x.shortopt map { o => "-" + o + ":" + x.keyName + "=" + x.valueName + " | " } getOrElse { "" }) +
-//       "--" + x.longopt + ":" + x.keyName + "=" + x.valueName + NLTB + x.description    
-//     case x if x.gobbleNextArgument =>
-//       (x.shortopt map { o => "-" + o + " " + x.valueName + " | " } getOrElse { "" }) +
-//       "--" + x.longopt + " " + x.valueName + NLTB + x.description
-//     case _ =>
-//       (opt.shortopt map { o => "-" + o + " | " } getOrElse { "" }) + 
-//       "--" + opt.longopt + NLTB + opt.description
-//   }) ++ (argList match {
-//     case Some(x: Argument[C]) => List(x.valueName + NLTB + x.description)
-//     case None                 => arguments.map(a => a.valueName + NLTB + a.description)
-//   })
-  
-  def descriptions = Nil
-
   def usage: String = {
-    import GenericOptionParser._
+    import OptionDefinition._
     val prorgamText = programName map { _ + " " } getOrElse { "" }
     val versionText = programName map { pg =>
       version map { NL + pg + " " + _ } getOrElse { "" }
     } getOrElse { "" }
-    val optionText = if (opts.isEmpty) {""} else {"[options] "}
+    val optionText = if (nonArgs.isEmpty) {""} else {"[options] "}
     val argumentList = arguments map {_.name} mkString(" ")
+    val descriptions = (nonArgs map {_.usage}) ++ (arguments map {_.usage})
 
     versionText + NL + "Usage: " + prorgamText + optionText + argumentList + NLNL +
     "  " + descriptions.mkString(NL + "  ") + NL
@@ -183,7 +194,7 @@ private[scopt] trait GenericOptionParser[C] {
       }
     }
     while (i < args.length) {
-      opts.find(_.tokensToRead(i, args) > 0) match {
+      nonArgs.find(_.tokensToRead(i, args) > 0) match {
         case Some(option) =>
           option(i, args) match {
             case Right(v) =>          handleArgument(option, v)
@@ -225,16 +236,4 @@ private[scopt] trait GenericOptionParser[C] {
 
     None
   }
-}
-
-private[scopt] object GenericOptionParser {
-  val UNBOUNDED = 1024
-  val NL = System.getProperty("line.separator")
-  val TB = "        "
-  val NLTB = NL + TB
-  val NLNL = NL + NL
-  val defaultKeyName = "<key>"
-  val defaultValueName = "<value>"
-  val atomic = new java.util.concurrent.atomic.AtomicInteger
-  def generateId: Int = atomic.incrementAndGet
 }
