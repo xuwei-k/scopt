@@ -3,6 +3,9 @@ import org.specs2._
 class MutableParserSpec extends Specification { def is =      s2"""
   This is a specification to check the mutable parser
 
+  opt[Unit]("foo") action { x => x } should
+    parse () out of --foo                                       ${unitParser("--foo")}
+
   opt[Int]("foo") action { x => x } should
     parse 1 out of --foo 1                                      ${intParser("--foo", "1")}
     parse 1 out of --foo:1                                      ${intParser("--foo:1")}
@@ -25,6 +28,15 @@ class MutableParserSpec extends Specification { def is =      s2"""
     parse ("k", 1) out of --foo k=1                             ${pairParser("--foo", "k=1")}
     parse ("k", 1) out of --foo:k=1                             ${pairParser("--foo:k=1")}    
                                                                 """
+
+  def unitParser(args: String*) = {
+    var foo = false
+    val parser = new scopt.OptionParser("scopt") {
+      opt[Unit]("foo") action { _ => foo = true }
+    }
+    parser.parse(args.toSeq)
+    foo === true
+  }
 
   def intParser(args: String*) = {
     var foo = 0

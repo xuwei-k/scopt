@@ -8,10 +8,12 @@ case object Arg extends OptionDefKind
 case object Sep extends OptionDefKind
 
 trait Read[A] {
+  def tokensToRead: Int 
   def reads: String => A
 }
 object Read {
   def reads[A](f: String => A): Read[A] = new Read[A] {
+    val tokensToRead = 1
     val reads = f
   }
   implicit val intRead: Read[Int]             = reads { _.toInt }
@@ -39,9 +41,14 @@ object Read {
       case -1     => throw new IllegalArgumentException("Expected a key=value pair")
       case n: Int => (s.slice(0, n), s.slice(n + 1, s.length))
     }
+  implicit val unitRead: Read[Unit] = new Read[Unit] { 
+    val tokensToRead = 0
+    val reads = { (s: String) => () }
+  }
 }
 
 private[scopt] abstract class OptionDefinition[A: Read, C] {
+  def read: Read[A] = implicitly[Read[A]]
   def kind: OptionDefKind
   def name: Option[String]
   def nameOrBlank: String = name.getOrElse("")
@@ -49,22 +56,15 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
   def shortOptOrBlank: String = _shortOpt map {_.toString} getOrElse("")
   def maxOccurs: Int
   def minOccurs: Int
-  def canBeInvoked: Boolean =
-    kind match {
-      case Opt => true
-      case _   => false
-    }
   def shortDescription: String =
     kind match {
       case Opt => "option " + nameOrBlank
       case _   => "argument " + nameOrBlank
     }
-  // def keyValueArgument: Boolean = kind == KVOpt
-  def gobbleNextArgument: Boolean = kind == Opt
   def callback: (A, C) => C
   def applyArgument(arg: String, config: C): Option[C]  =
     try {
-      Some(callback(implicitly[Read[A]].reads(arg), config))
+      Some(callback(read.reads(arg), config))
     } catch {
       case e: NumberFormatException =>
         System.err.println("Error: " + shortDescription + " expects a number but was given '" + arg + "'")
@@ -76,12 +76,12 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
   // number of tokens to read: 0 or no match, 2 for "--foo 1", 1 for "--foo:1"
   def shortOptTokens(arg: String): Int =
     _shortOpt match {
-      case Some(c) if arg == "-" + shortOptOrBlank                 => 2
+      case Some(c) if arg == "-" + shortOptOrBlank                 => 1 + read.tokensToRead
       case Some(c) if arg startsWith ("-" + shortOptOrBlank + ":") => 1
       case _ => 0
     }
   def longOptTokens(arg: String): Int =
-    if (arg == "--" + nameOrBlank) 2
+    if (arg == "--" + nameOrBlank) 1 + read.tokensToRead
     else if (arg startsWith ("--" + nameOrBlank + ":")) 1
     else 0
   def tokensToRead(i: Int, args: Seq[String]): Int =
@@ -96,9 +96,9 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
     else args(i) match {
       case arg if longOptTokens(arg) == 2 || shortOptTokens(arg) == 2 =>
         token(i + 1, args) map {Right(_)} getOrElse Left("Missing value after '" + arg + "'")
-      case arg if longOptTokens(arg) == 1 =>
+      case arg if longOptTokens(arg) == 1 && read.tokensToRead == 1 =>
         Right(arg drop ("--" + nameOrBlank + ":").length)
-      case arg if shortOptTokens(arg) == 1 =>
+      case arg if shortOptTokens(arg) == 1 && read.tokensToRead == 1 =>
         Right(arg drop ("-" + shortOptOrBlank + ":").length)
       case _ => Right("")
     }
@@ -124,14 +124,6 @@ private[scopt] abstract class OptionDefinition[A: Read, C] {
 
 //   override def shortDescription = "argument " + name
 // }
-      
-// private[scopt] class FlagOptionDefinition[C](
-//         shortopt: Option[String],
-//         longopt: String,
-//         description: String,
-//         action: C => C
-//         ) extends OptionDefinition[C](true, shortopt, longopt, null, null,
-//           description, { (a: String, c: C) => action(c) }, false, false, 0, UNBOUNDED)
 
 private[scopt] trait GenericOptionParser[C] {
   def options: Seq[OptionDefinition[_, C]]
