@@ -45,10 +45,10 @@ object Read {
   }
 }
 
-trait OptionDefKind {}
-case object Opt extends OptionDefKind
-case object Arg extends OptionDefKind
-case object Sep extends OptionDefKind
+private[scopt] trait OptionDefKind {}
+private[scopt] case object Opt extends OptionDefKind
+private[scopt] case object Arg extends OptionDefKind
+private[scopt] case object Sep extends OptionDefKind
 
 private[scopt] trait GenericOptionParser[C] {
   type Def[A] <: OptionDefinition[A, C]
