@@ -43,7 +43,7 @@ lazy val scopt = (crossProject(JSPlatform, JVMPlatform, NativePlatform) in file(
     scalaJSModuleKind := ModuleKind.CommonJSModule,
     scalacOptions += {
       val a = (baseDirectory in LocalRootProject).value.toURI.toString
-      val g = "https://raw.githubusercontent.com/scopt/scopt/" + sys.process.Process("git rev-parse HEAD").lines_!.head
+      val g = "https://raw.githubusercontent.com/scopt/scopt/" + sys.process.Process("git rev-parse HEAD").lineStream_!.head
       s"-P:scalajs:mapSourceURI:$a->$g/"
     },
     sources in Test := {
