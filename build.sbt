@@ -37,7 +37,7 @@ lazy val scopt = (crossProject(JSPlatform, JVMPlatform, NativePlatform) in file(
     },
     resolvers += "sonatype-public" at "https://oss.sonatype.org/content/repositories/public",
     libraryDependencies ++= Seq(
-      "io.monix" %%% "minitest" % "2.2.2" % Test,
+      "io.monix" %%% "minitest" % "2.3.2" % Test,
       "com.eed3si9n.expecty" %%% "expecty" % "0.11.0" % Test,
     ),
     testFrameworks += new TestFramework("minitest.runner.Framework"),
