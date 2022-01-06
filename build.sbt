@@ -73,9 +73,6 @@ lazy val scopt = (crossProject(JSPlatform, JVMPlatform, NativePlatform) in file(
       s"${key}:$a->$g/"
     },
   )
-  .nativeSettings(
-    crossScalaVersions := Seq(scala211, scala212, scala213),
-  )
 
 lazy val scoptJS = scopt.js
 
