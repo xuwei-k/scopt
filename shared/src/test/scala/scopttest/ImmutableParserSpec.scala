@@ -46,6 +46,20 @@ object ImmutableParserSpec extends verify.BasicTestSuite {
     longParser("-f:0x1")
   }
 
+  test("short parser should parse 1") {
+    shortParser("--foo", "1")
+    shortParser("--foo:1")
+    shortParser("--foo=1")
+    shortParser("-f", "1")
+    shortParser("-f:1")
+    shortParser("-f=1")
+    shortParser("--foo", "0x01")
+    shortParser("--foo:0x01")
+    shortParser("--foo=0x01")
+    shortParser("-f", "0x1")
+    shortParser("-f:0x1")
+  }
+
   test("string parser should parse bar") {
     stringParser("--foo", "bar")
     stringParser("--foo:bar")
@@ -416,8 +430,18 @@ Usage: scopt [options]
     help("help")
   }
   def longParser(args: String*): Unit = {
-    val result = intParser1.parse(args.toSeq, Config())
-    assert(result.get.intValue == 1)
+    val result = longParser1.parse(args.toSeq, Config())
+    assert(result.get.longValue == 1)
+  }
+
+  val shortParser1 = new scopt.OptionParser[Config]("scopt") {
+    head("scopt", "3.x")
+    opt[Short]('f', "foo").action((x, c) => c.copy(shortValue = x))
+    help("help")
+  }
+  def shortParser(args: String*): Unit = {
+    val result = shortParser1.parse(args.toSeq, Config())
+    assert(result.get.shortValue == 1)
   }
 
   val stringParser1 = new scopt.OptionParser[Config]("scopt") {
@@ -968,6 +992,7 @@ Usage: scopt [options]
       flag: Boolean = false,
       intValue: Int = 0,
       longValue: Long = 0L,
+      shortValue: Short = 0.toShort,
       stringValue: String = "",
       doubleValue: Double = 0.0,
       boolValue: Boolean = false,
