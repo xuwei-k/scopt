@@ -58,6 +58,10 @@ object Read extends platform.PlatformReadInstances {
     val (s, radix) = fixedPointWithRadix(str)
     java.lang.Long.parseLong(s, radix)
   }
+  implicit val shortRead: Read[Short] = reads { str =>
+    val (s, radix) = fixedPointWithRadix(str)
+    java.lang.Short.parseShort(s, radix)
+  }
   implicit val bigIntRead: Read[BigInt] = reads { str =>
     val (s, radix) = fixedPointWithRadix(str)
     BigInt(s, radix)
