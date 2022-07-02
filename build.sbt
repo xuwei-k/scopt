@@ -3,7 +3,7 @@ import Dependencies._
 // shadow sbt-scalajs' crossProject and CrossType until Scala.js 1.0.0 is released
 import sbtcrossproject.crossProject
 
-def v: String = "4.0.1-SNAPSHOT"
+def v: String = "4.1.1-SNAPSHOT"
 
 ThisBuild / version := v
 ThisBuild / scalaVersion := scala213
