@@ -1,8 +1,8 @@
 val scalaJSVersion =
-  Option(System.getenv("SCALAJS_VERSION")).getOrElse("1.8.0")
+  Option(System.getenv("SCALAJS_VERSION")).getOrElse("1.10.1")
 
 val scalaNativeVersion =
-  Option(System.getenv("SCALANATIVE_VERSION")).getOrElse("0.4.3")
+  Option(System.getenv("SCALANATIVE_VERSION")).getOrElse("0.4.5")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-site" % "1.3.3")
 
