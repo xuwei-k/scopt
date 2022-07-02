@@ -235,6 +235,10 @@ class OParser[A, C](head: OptionDef[A, C], rest: List[OptionDef[_, C]]) {
   def validate(f: A => Either[String, Unit]): OParser[A, C] =
     subHead[A](head.validate(f))
 
+  /** provides a default to fallback to, e.g. for System.getenv */
+  def withFallback(to: () => A): OParser[A, C] =
+    subHead[A](head.withFallback(to))
+
   def toList: List[OptionDef[_, C]] = head :: rest
   def ++(other: OParser[_, C]): OParser[A, C] =
     OParser(head, rest ::: other.toList)
