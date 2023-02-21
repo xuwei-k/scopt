@@ -423,7 +423,7 @@ val result = OParser.parse(parser1, args, Config(), setup)
 
 ### Advanced: Rendering mode
 
-scopt 3.5.0 introduced rendering mode, and adopted two-column rendeing of the usage text by default. To switch back to the older one-column rendering override the `renderingMode` method:
+scopt 3.5.0 introduced rendering mode, and adopted two-column rendering of the usage text by default. To switch back to the older one-column rendering override the `renderingMode` method:
 
 ```scala
 import scopt.{ OParserSetup, DefaultOParserSetup }
