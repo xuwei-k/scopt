@@ -31,7 +31,7 @@ private[scopt] object platform {
     implicit val pathRead: Read[Path] = Read.reads { Paths.get(_) }
     implicit val sourceRead: scopt.Read[Source] = scopt.Read.reads { Source.fromFile(_) }
     implicit val inetAddress: Read[InetAddress] = Read.reads { InetAddress.getByName(_) }
-    implicit val urlRead: Read[URL] = Read.reads { new URL(_) }
+    implicit val urlRead: Read[URL] = Read.reads { new URI(_).toURL }
   }
 
   def applyArgumentExHandler[C](

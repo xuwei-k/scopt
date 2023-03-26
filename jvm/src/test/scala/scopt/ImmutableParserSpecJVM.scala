@@ -8,7 +8,7 @@ import scala.io.Source
 
 object ImmutableParserSpecJVM extends verify.BasicTestSuite {
 
-  private val url = new URL("https://example.com")
+  private val url = new URI("https://example.com").toURL
   private val uri = new URI("https://example.com/robots.txt")
 
   test("calendar parser should parse 2000-01-01") {
