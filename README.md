@@ -385,6 +385,8 @@ parser.parse(args, Config()) match {
 
 Create a `scopt.OptionParser[Unit]` and customize it with the options you need, passing in functions to process each option or argument. Use `foreach` instead of `action`.
 
+Mutable parsing has changed from scopt 3.x. When upgrading from 3.x, replace `parser.parse(args)` with `parser.parse(args, ()).isDefined`.
+
 ```scala
 val parser = new scopt.OptionParser[Unit]("scopt") {
   head("scopt", "4.x")
@@ -399,7 +401,7 @@ val parser = new scopt.OptionParser[Unit]("scopt") {
     .foreach( x => c = c.copy(out = x) )
     .text("out is a required file property")
 }
-if (parser.parse(args), ()) {
+if (parser.parse(args, ()).isDefined) {
   // do stuff
 }
 else {
