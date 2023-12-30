@@ -3,11 +3,11 @@ package scopttest
 object Issue239 extends verify.BasicTestSuite {
   test("double arg should accept negative numbers") {
     val set = List("-3.1415926" -> -3.1415926, "-.1" -> -.1)
+    val p = new scopt.OptionParser[Double]("Test") {
+      opt[String]('n', "name")
+      arg[Double]("value").action((v, _) => v)
+    }
     set.foreach { case (arg, expected) =>
-      val p = new scopt.OptionParser[Double]("Test") {
-        opt[String]('n', "name")
-        arg[Double]("value").action((v, _) => v)
-      }
       val res = p.parse(Array("--", arg), Double.NaN)
       assert(res == Some(expected))
     }
@@ -16,11 +16,11 @@ object Issue239 extends verify.BasicTestSuite {
 
   test("int arg should accept negative numbers") {
     val set = List("-3" -> -3, "-0" -> 0)
+    val p = new scopt.OptionParser[Int]("Test") {
+      opt[String]('n', "name")
+      arg[Int]("value").action((v, _) => v)
+    }
     set.foreach { case (arg, expected) =>
-      val p = new scopt.OptionParser[Int]("Test") {
-        opt[String]('n', "name")
-        arg[Int]("value").action((v, _) => v)
-      }
       val res = p.parse(Array("--", arg), Int.MaxValue)
       assert(res == Some(expected))
     }
