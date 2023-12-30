@@ -798,7 +798,7 @@ Usage: scopt [options]
         kwargs: Map[String, String] = Map()
     )
     val parser = new scopt.OptionParser[Config]("scopt") {
-      override def renderingMode = scopt.RenderingMode.OneColumn
+      override def renderingMode: scopt.RenderingMode = scopt.RenderingMode.OneColumn
       head("scopt", "3.x")
 
       opt[Int]('f', "foo").action((x, c) => c.copy(foo = x)).text("foo is an integer property")
