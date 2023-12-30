@@ -3,7 +3,7 @@
 # scopt
 [![Maven Central](https://img.shields.io/maven-central/v/com.github.scopt/scopt_2.11.svg)](https://maven-badges.herokuapp.com/maven-central/com.github.scopt/scopt_2.11)
 [![Javadocs](https://javadoc.io/badge/com.github.scopt/scopt_2.12.svg)](https://javadoc.io/doc/com.github.scopt/scopt_2.12)
-[![Build Status](https://travis-ci.org/scopt/scopt.svg?branch=scopt3)](https://travis-ci.org/scopt/scopt)
+[![Build Status](https://github.com/scopt/scopt/actions/workflows/ci.yml/badge.svg?branch=develop&event=push)](https://github.com/scopt/scopt/actions/workflows/ci.yml)
 
 scopt is a little command line options parsing library.
 
