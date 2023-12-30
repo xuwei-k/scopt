@@ -43,7 +43,7 @@ lazy val scopt = (crossProject(JSPlatform, JVMPlatform, NativePlatform) in file(
     scalacOptions ++= {
       CrossVersion.partialVersion(scalaVersion.value) match {
         case Some((3, _)) =>
-          Seq("-source:3.0-migration")
+          Nil
         case Some((2, v)) if v <= 12 =>
           Seq("-Xfuture")
         case _ =>
