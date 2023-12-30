@@ -1,12 +1,12 @@
 val scalaJSVersion =
-  Option(System.getenv("SCALAJS_VERSION")).getOrElse("1.10.1")
+  Option(System.getenv("SCALAJS_VERSION")).getOrElse("1.12.0")
 
 val scalaNativeVersion =
-  Option(System.getenv("SCALANATIVE_VERSION")).getOrElse("0.4.5")
+  Option(System.getenv("SCALANATIVE_VERSION")).getOrElse("0.4.9")
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-site" % "1.3.3")
+addSbtPlugin("com.github.sbt" % "sbt-site" % "1.5.0")
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-ghpages" % "0.6.3")
+addSbtPlugin("com.github.sbt" % "sbt-ghpages" % "0.8.0")
 
 ivyXML :=
   <dependency org="org.eclipse.jetty.orbit" name="javax.servlet"
@@ -15,8 +15,8 @@ ivyXML :=
   </dependency>
 
 addSbtPlugin("org.scala-js" % "sbt-scalajs" % scalaJSVersion)
-addSbtPlugin("org.portable-scala" % "sbt-scalajs-crossproject" % "1.0.0")
-addSbtPlugin("org.portable-scala" % "sbt-scala-native-crossproject" % "1.0.0")
+addSbtPlugin("org.portable-scala" % "sbt-scalajs-crossproject" % "1.3.2")
+addSbtPlugin("org.portable-scala" % "sbt-scala-native-crossproject" % "1.3.2")
 addSbtPlugin("org.scala-native" % "sbt-scala-native" % scalaNativeVersion)
-addSbtPlugin("com.jsuereth" % "sbt-pgp" % "2.0.1")
-addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6")
+addSbtPlugin("com.github.sbt" % "sbt-pgp" % "2.2.1")
+addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.2")
