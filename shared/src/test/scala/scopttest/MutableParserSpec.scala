@@ -412,7 +412,7 @@ object MutableParserSpec extends verify.BasicTestSuite {
     )
     var c = Config()
     val parser = new scopt.OptionParser[Unit]("scopt") {
-      override def renderingMode = scopt.RenderingMode.OneColumn
+      override def renderingMode: scopt.RenderingMode = scopt.RenderingMode.OneColumn
       head("scopt", "3.x")
 
       opt[Int]('f', "foo").foreach(x => c = c.copy(foo = x)).text("foo is an integer property")
