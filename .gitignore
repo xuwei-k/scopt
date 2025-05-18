@@ -9,3 +9,4 @@ lib_managed
 
 # sbt temp file
 /.bsp/
+metals.sbt
