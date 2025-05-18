@@ -9,6 +9,7 @@ ThisBuild / version := v
 ThisBuild / scalaVersion := scala213
 ThisBuild / crossScalaVersions := Seq(scala211, scala212, scala213, scala3)
 ThisBuild / scalafmtOnCompile := true
+ThisBuild / semanticdbEnabled := false
 
 lazy val root = (project in file("."))
   .aggregate(scoptJS, scoptJVM, scoptNative)
@@ -65,6 +66,8 @@ lazy val scopt = (crossProject(JSPlatform, JVMPlatform, NativePlatform) in file(
     },
   )
   .jsSettings(
+    bspEnabled := false,
+    semanticdbEnabled := false,
     scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.CommonJSModule)),
     scalacOptions += {
       val a = (LocalRootProject / baseDirectory).value.toURI.toString
@@ -82,6 +85,8 @@ lazy val scopt = (crossProject(JSPlatform, JVMPlatform, NativePlatform) in file(
     },
   )
   .nativeSettings(
+    bspEnabled := false,
+    semanticdbEnabled := false,
     crossScalaVersions := Seq(scala212, scala213, scala3)
   )
 

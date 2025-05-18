@@ -34,6 +34,7 @@ jobs:
         distribution: temurin
         java-version: "${{ matrix.java }}"
         cache: sbt
+    - uses: sbt/setup-sbt@v1
     - name: Setup node
       uses: actions/setup-node@v4
       with:
