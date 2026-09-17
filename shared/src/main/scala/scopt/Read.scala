@@ -27,7 +27,7 @@ object Read extends platform.PlatformReadInstances {
     reads {
       _.toCharArray match {
         case Array(char) => char
-        case s =>
+        case s           =>
           throw new IllegalArgumentException("'" + s + "' is not a char.")
       }
     }
@@ -41,7 +41,7 @@ object Read extends platform.PlatformReadInstances {
         case "no"    => false
         case "1"     => true
         case "0"     => false
-        case s =>
+        case s       =>
           throw new IllegalArgumentException("'" + s + "' is not a boolean.")
       }
     }
