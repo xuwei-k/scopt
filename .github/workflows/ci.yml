@@ -15,15 +15,15 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            java: 8
+            java: 17
             distribution: zulu
             jobtype: 1
           - os: ubuntu-latest
-            java: 8
+            java: 17
             distribution: zulu
             jobtype: 2
           - os: ubuntu-latest
-            java: 17
+            java: 25
             distribution: temurin
             jobtype: 1
     runs-on: ${{ matrix.os }}
@@ -45,7 +45,7 @@ jobs:
       if: ${{ matrix.jobtype == 1 }}
       shell: bash
       run: |
-        sbt -v +scalafmtCheckAll scalafmtSbtCheck +scoptJS/test +scoptJVM/test
+        sbt -v "+scalafmtCheckAll ; scalafmtSbtCheck ; +scoptJS/test ; +scoptJVM/test"
     - name: Build and test (2)
       if: ${{ matrix.jobtype == 2 }}
       shell: bash

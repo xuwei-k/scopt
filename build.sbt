@@ -21,7 +21,8 @@ lazy val root = (project in file("."))
     },
   )
 
-lazy val scopt = (crossProject(JSPlatform, JVMPlatform, NativePlatform) in file("."))
+lazy val scopt = crossProject(JSPlatform, JVMPlatform, NativePlatform)
+  .in(file("."))
   .settings(
     name := "scopt",
     // site
@@ -29,7 +30,7 @@ lazy val scopt = (crossProject(JSPlatform, JVMPlatform, NativePlatform) in file(
     // to push, ghpages-push-site
     SiteScaladoc / siteSubdirName := s"$v/api",
     git.remoteRepo := "git@github.com:scopt/scopt.git",
-    scalacOptions ++= Seq("-language:existentials", "-deprecation"),
+    scalacOptions ++= Seq("-language:existentials", "-deprecation", "-release:8"),
     scalacOptions ++= {
       scalaBinaryVersion.value match {
         case "3" =>
@@ -48,7 +49,7 @@ lazy val scopt = (crossProject(JSPlatform, JVMPlatform, NativePlatform) in file(
           Nil
       }
     },
-    libraryDependencies += "com.eed3si9n.verify" %%% "verify" % verifyVersion % Test,
+    libraryDependencies += "com.eed3si9n.verify" %% "verify" % verifyVersion % Test,
     testFrameworks += new TestFramework("verify.runner.Framework"),
     // libraryDependencies += "org.scalameta" %% "munit" % "0.7.20" % Test,
     // testFrameworks += new TestFramework("munit.Framework"),
@@ -68,7 +69,7 @@ lazy val scopt = (crossProject(JSPlatform, JVMPlatform, NativePlatform) in file(
       val a = (LocalRootProject / baseDirectory).value.toURI.toString
       val g = "https://raw.githubusercontent.com/scopt/scopt/" + sys.process
         .Process("git rev-parse HEAD")
-        .lineStream_!
+        .lazyLines_!
         .head
       val key = CrossVersion.partialVersion(scalaVersion.value) match {
         case Some((3, _)) =>
@@ -80,6 +81,10 @@ lazy val scopt = (crossProject(JSPlatform, JVMPlatform, NativePlatform) in file(
     },
   )
   .nativeSettings(
+    evictionErrorLevel := {
+      // https://github.com/eed3si9n/verify/pull/380
+      Level.Warn
+    },
     bspEnabled := false,
     semanticdbEnabled := false,
     crossScalaVersions := Seq(scala212, scala213, scala3)
