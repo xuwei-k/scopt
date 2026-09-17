@@ -57,9 +57,9 @@ private[scopt] object ORunner {
       value.kind match {
         case ProgramName         => value.desc
         case Head | Note | Check => value.desc
-        case Cmd =>
+        case Cmd                 =>
           "Command: " + commandExample(Some(value)) + NL + value.desc
-        case Arg => WW + value.name + NLTB + value.desc
+        case Arg                          => WW + value.name + NLTB + value.desc
         case Opt if value.read.arity == 2 =>
           WW + (value.shortOpt map { o =>
             "-" + o + ":" + value.keyValueString + " | "
@@ -84,9 +84,9 @@ private[scopt] object ORunner {
       value.kind match {
         case ProgramName         => value.desc
         case Head | Note | Check => ""
-        case Cmd =>
+        case Cmd                 =>
           "Command: " + commandExample(Some(value)) + NL
-        case Arg => WW + value.name
+        case Arg                          => WW + value.name
         case Opt if value.read.arity == 2 =>
           WW + (value.shortOpt map { o =>
             "-" + o + ", "
@@ -236,18 +236,27 @@ private[scopt] object ORunner {
       // commands are cleared to guarantee that it appears first
       pendingCommands.clear()
 
-      pendingOptions insertAll (0, nonArgs filter { x =>
-        x.getParentId == Some(opt.id) &&
-        !pendingOptions.contains(x)
-      })
-      pendingArgs insertAll (0, arguments filter { x =>
-        x.getParentId == Some(opt.id) &&
-        !pendingArgs.contains(x)
-      })
-      pendingCommands insertAll (0, commands filter { x =>
-        x.getParentId == Some(opt.id) &&
-        !pendingCommands.contains(x)
-      })
+      pendingOptions insertAll (
+        0,
+        nonArgs filter { x =>
+          x.getParentId == Some(opt.id) &&
+          !pendingOptions.contains(x)
+        }
+      )
+      pendingArgs insertAll (
+        0,
+        arguments filter { x =>
+          x.getParentId == Some(opt.id) &&
+          !pendingArgs.contains(x)
+        }
+      )
+      pendingCommands insertAll (
+        0,
+        commands filter { x =>
+          x.getParentId == Some(opt.id) &&
+          !pendingCommands.contains(x)
+        }
+      )
     }
     def handleError(msg: String): Unit = {
       if (errorOnUnknownArgument) {
@@ -381,12 +390,12 @@ private[scopt] object ORunner {
               case arg if processOptions && arg.startsWith("--") =>
                 handleError("Unknown option " + arg)
               case arg if processOptions && isShortOpt(arg) => handleShortOptions(arg drop 1)
-              case arg if findCommand(arg).isDefined =>
+              case arg if findCommand(arg).isDefined        =>
                 val cmd = findCommand(arg).get
                 handleOccurrence(cmd, pendingCommands)
                 handleArgument(cmd, "")
               case arg if pendingArgs.isEmpty => handleError("Unknown argument '" + arg + "'")
-              case arg =>
+              case arg                        =>
                 val first = pendingArgs.head
                 handleOccurrence(first, pendingArgs)
                 handleArgument(first, arg)
